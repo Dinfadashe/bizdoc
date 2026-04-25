@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import { calcTotals, formatCurrency, generateInvoiceNumber } from "@/lib/utils";
+import { calcTotals, formatCurrency } from "@/lib/utils";
 
 interface LineItem { id: number; description: string; qty: number; unit_price: string; }
 
@@ -38,7 +38,7 @@ export default function NewInvoice() {
     setItems(items.map(i => i.id === id ? { ...i, [field]: val } : i));
 
   const handleSave = async (sendNow = false) => {
-    if (!userId) return;
+    if (!userId || !client.name.trim()) return;
     setSaving(true);
     const res = await fetch("/api/invoices", {
       method: "POST",
@@ -56,8 +56,7 @@ export default function NewInvoice() {
     const data = await res.json();
     setSaving(false);
     if (data.invoice) {
-      if (sendNow) {
-        // Generate payment link immediately
+      if (sendNow && client.email) {
         await fetch(`/api/invoices/${data.invoice.id}/payment-link`, { method: "POST" });
       }
       router.push(`/invoices/${data.invoice.id}`);
@@ -94,11 +93,22 @@ export default function NewInvoice() {
         <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 16, overflow: "hidden" }}>
           <div style={{ padding: "12px 20px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>Client Information</div>
           <div style={{ padding: 20, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14 }}>
-            {(["name", "email", "phone", "address"] as const).map(field => (
-              <div key={field}><label style={labelStyle}>Client {field}</label>
-                <input value={client[field]} onChange={e => setClient({ ...client, [field]: e.target.value })} style={inputStyle} placeholder={field === "email" ? "client@email.com" : ""} />
-              </div>
-            ))}
+            <div>
+              <label style={labelStyle}>Client Name *</label>
+              <input value={client.name} onChange={e => setClient({ ...client, name: e.target.value })} style={inputStyle} placeholder="Client or company name" required />
+            </div>
+            <div>
+              <label style={{ ...labelStyle }}>Email <span style={{ fontWeight: 400, color: "#bbb", textTransform: "none" }}>(optional)</span></label>
+              <input value={client.email} onChange={e => setClient({ ...client, email: e.target.value })} style={inputStyle} placeholder="client@email.com" />
+            </div>
+            <div>
+              <label style={{ ...labelStyle }}>Phone <span style={{ fontWeight: 400, color: "#bbb", textTransform: "none" }}>(optional)</span></label>
+              <input value={client.phone} onChange={e => setClient({ ...client, phone: e.target.value })} style={inputStyle} placeholder="+234..." />
+            </div>
+            <div>
+              <label style={{ ...labelStyle }}>Address <span style={{ fontWeight: 400, color: "#bbb", textTransform: "none" }}>(optional)</span></label>
+              <input value={client.address} onChange={e => setClient({ ...client, address: e.target.value })} style={inputStyle} />
+            </div>
           </div>
         </div>
 
@@ -137,8 +147,8 @@ export default function NewInvoice() {
             <div style={{ minWidth: 220 }}>
               {[
                 ["Subtotal", formatCurrency(subtotal, currency)],
-                discountAmount > 0 ? ["Discount", `−${formatCurrency(discountAmount, currency)}`] : null,
-                taxAmount > 0 ? [`Tax (${taxRate}%)`, formatCurrency(taxAmount, currency)] : null,
+                discountAmount > 0 ? ["Discount", "-" + formatCurrency(discountAmount, currency)] : null,
+                taxAmount > 0 ? ["Tax (" + taxRate + "%)", formatCurrency(taxAmount, currency)] : null,
               ].filter(Boolean).map(([label, val]) => (
                 <div key={label as string} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--muted)", padding: "4px 0" }}>
                   <span>{label}</span><span>{val as string}</span>
@@ -156,19 +166,24 @@ export default function NewInvoice() {
           <div style={{ padding: "12px 20px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>Notes & Payment Info</div>
           <div style={{ padding: 20, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div><label style={labelStyle}>Notes / Terms</label><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} placeholder="Payment terms, thank you note..." /></div>
-            <div><label style={labelStyle}>Payment Instructions</label><textarea value={paymentInfo} onChange={e => setPaymentInfo(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} placeholder="Bank, account no., account name..." /></div>
+            <div><label style={labelStyle}>Additional Payment Instructions</label><textarea value={paymentInfo} onChange={e => setPaymentInfo(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} placeholder="Any extra payment notes..." /></div>
           </div>
         </div>
 
         {/* Actions */}
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <button onClick={() => handleSave(false)} disabled={saving} style={{ padding: "12px 24px", background: "#f5f2ed", color: "var(--text)", border: "1.5px solid var(--border)", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)" }}>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+          <button onClick={() => handleSave(false)} disabled={saving || !client.name.trim()} style={{ padding: "12px 24px", background: "#f5f2ed", color: "var(--text)", border: "1.5px solid var(--border)", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: !client.name.trim() ? "not-allowed" : "pointer", opacity: !client.name.trim() ? 0.6 : 1, fontFamily: "var(--font-body)" }}>
             Save as Draft
           </button>
-          <button onClick={() => handleSave(true)} disabled={saving || !client.email} style={{ padding: "12px 28px", background: "var(--green)", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: saving || !client.email ? "not-allowed" : "pointer", opacity: saving || !client.email ? 0.7 : 1, fontFamily: "var(--font-body)" }}>
+          <button onClick={() => handleSave(true)} disabled={saving || !client.name.trim()} style={{ padding: "12px 28px", background: "var(--green)", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: saving || !client.name.trim() ? "not-allowed" : "pointer", opacity: saving || !client.name.trim() ? 0.7 : 1, fontFamily: "var(--font-body)" }}>
             {saving ? "Saving..." : "Save & Send Invoice →"}
           </button>
-          {!client.email && <div style={{ fontSize: 12, color: "var(--muted)", alignSelf: "center" }}>Add client email to send</div>}
+          {!client.name.trim() && (
+            <div style={{ fontSize: 12, color: "var(--muted)", alignSelf: "center" }}>Client name is required</div>
+          )}
+          {client.name.trim() && !client.email && (
+            <div style={{ fontSize: 12, color: "#b36000", alignSelf: "center" }}>No email — invoice will be saved but payment link won't be sent</div>
+          )}
         </div>
       </div>
     </div>

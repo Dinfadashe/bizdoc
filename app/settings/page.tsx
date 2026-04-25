@@ -20,7 +20,6 @@ export default function Settings() {
   const [logoError, setLogoError] = useState("");
   const logoInputRef = useRef<HTMLInputElement>(null);
 
-  // Payout fields
   const [banks, setBanks] = useState<Bank[]>([]);
   const [bankCode, setBankCode] = useState("");
   const [bankName, setBankName] = useState("");
@@ -32,6 +31,17 @@ export default function Settings() {
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [savingPayout, setSavingPayout] = useState(false);
   const [payoutSaved, setPayoutSaved] = useState(false);
+
+  // DVA state
+  const [dvaAccountNumber, setDvaAccountNumber] = useState("");
+  const [dvaAccountName, setDvaAccountName] = useState("");
+  const [dvaBank, setDvaBank] = useState("");
+  const [dvaFirstName, setDvaFirstName] = useState("");
+  const [dvaLastName, setDvaLastName] = useState("");
+  const [dvaEmail, setDvaEmail] = useState("");
+  const [dvaPreferredBank, setDvaPreferredBank] = useState("wema-bank");
+  const [creatingDva, setCreatingDva] = useState(false);
+  const [dvaError, setDvaError] = useState("");
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -48,6 +58,11 @@ export default function Settings() {
         setAccountName(biz.account_name ?? "");
         setSubaccountCode(biz.subaccount_code ?? "");
         setOnboardingComplete(biz.onboarding_complete ?? false);
+        setDvaAccountNumber(biz.dva_account_number ?? "");
+        setDvaAccountName(biz.dva_account_name ?? "");
+        setDvaBank(biz.dva_bank ?? "");
+        // Pre-fill DVA form with business email
+        setDvaEmail(biz.email ?? "");
       }
     });
     fetch("/api/banks").then(r => r.json()).then(d => setBanks(d.banks ?? [])).catch(() => {});
@@ -56,36 +71,18 @@ export default function Settings() {
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !userId) return;
-
-    // Validate file type and size
     if (!file.type.startsWith("image/")) { setLogoError("Please upload an image file."); return; }
     if (file.size > 2 * 1024 * 1024) { setLogoError("Image must be under 2MB."); return; }
-
     setUploadingLogo(true);
     setLogoError("");
-
-    // Show local preview immediately
     const localUrl = URL.createObjectURL(file);
     setLogoPreview(localUrl);
-
-    // Upload to Supabase Storage
     const ext = file.name.split(".").pop();
     const path = `${userId}/logo.${ext}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("logos")
-      .upload(path, file, { upsert: true });
-
-    if (uploadError) {
-      setLogoError("Upload failed: " + uploadError.message);
-      setUploadingLogo(false);
-      return;
-    }
-
-    // Get public URL
+    const { error: uploadError } = await supabase.storage.from("logos").upload(path, file, { upsert: true });
+    if (uploadError) { setLogoError("Upload failed: " + uploadError.message); setUploadingLogo(false); return; }
     const { data: urlData } = supabase.storage.from("logos").getPublicUrl(path);
     const publicUrl = urlData.publicUrl;
-
     setForm(f => ({ ...f, logo_url: publicUrl }));
     setLogoPreview(publicUrl);
     setUploadingLogo(false);
@@ -143,6 +140,32 @@ export default function Settings() {
     }
   };
 
+  const handleCreateDVA = async () => {
+    if (!userId) return;
+    setCreatingDva(true);
+    setDvaError("");
+    const res = await fetch("/api/dva", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: userId,
+        first_name: dvaFirstName,
+        last_name: dvaLastName,
+        email: dvaEmail,
+        preferred_bank: dvaPreferredBank,
+      }),
+    });
+    const data = await res.json();
+    setCreatingDva(false);
+    if (data.account_number) {
+      setDvaAccountNumber(data.account_number);
+      setDvaAccountName(data.account_name);
+      setDvaBank(data.bank);
+    } else {
+      setDvaError(data.error ?? "Failed to create virtual account");
+    }
+  };
+
   const inputStyle = { width: "100%", padding: "10px 12px", border: "1.5px solid var(--border)", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-body)" };
   const labelStyle = { display: "block" as const, fontSize: 11, fontWeight: 700 as const, textTransform: "uppercase" as const, letterSpacing: "0.8px", color: "var(--muted)", marginBottom: 6 };
 
@@ -154,12 +177,10 @@ export default function Settings() {
       </nav>
 
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "32px 20px" }}>
-
-        {/* Tabs */}
         <div style={{ display: "flex", background: "#e8e4de", borderRadius: 10, padding: 4, gap: 4, marginBottom: 24 }}>
           {(["profile", "payouts"] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "10px", border: "none", borderRadius: 7, fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "var(--font-body)", background: tab === t ? "white" : "transparent", color: tab === t ? "var(--green)" : "var(--muted)", boxShadow: tab === t ? "0 1px 3px rgba(0,0,0,0.1)" : "none" }}>
-              {t === "payouts" ? "💳 Payout Account" : "🏢 Business Profile"}
+              {t === "payouts" ? "Payout Account" : "Business Profile"}
             </button>
           ))}
         </div>
@@ -167,16 +188,11 @@ export default function Settings() {
         {/* Profile Tab */}
         {tab === "profile" && (
           <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
-            <div style={{ padding: "14px 24px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>
-              Business Profile
-            </div>
+            <div style={{ padding: "14px 24px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>Business Profile</div>
             <form onSubmit={handleSaveProfile} style={{ padding: 24 }}>
-
-              {/* Logo upload */}
               <div style={{ marginBottom: 24 }}>
                 <label style={labelStyle}>Business Logo</label>
                 <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                  {/* Preview */}
                   <div onClick={() => logoInputRef.current?.click()} style={{ width: 80, height: 80, borderRadius: 12, border: "2px dashed var(--border)", background: "#faf9f7", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", overflow: "hidden", flexShrink: 0, position: "relative" }}>
                     {logoPreview ? (
                       <img src={logoPreview} alt="logo" style={{ width: "100%", height: "100%", objectFit: "contain", padding: 6 }} />
@@ -187,13 +203,9 @@ export default function Settings() {
                       </div>
                     )}
                     {uploadingLogo && (
-                      <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "var(--green)", fontWeight: 700 }}>
-                        Uploading...
-                      </div>
+                      <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "var(--green)", fontWeight: 700 }}>Uploading...</div>
                     )}
                   </div>
-
-                  {/* Upload button */}
                   <div>
                     <button type="button" onClick={() => logoInputRef.current?.click()} style={{ padding: "9px 18px", background: "var(--green-light)", color: "var(--green)", border: "1.5px solid #b8dfc9", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", display: "block", marginBottom: 6 }}>
                       {logoPreview ? "Change Logo" : "Upload Logo"}
@@ -219,12 +231,11 @@ export default function Settings() {
                 <label style={labelStyle}>Address</label>
                 <input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} style={inputStyle} />
               </div>
-
               <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                 <button type="submit" disabled={saving || uploadingLogo} style={{ padding: "11px 28px", background: "var(--green)", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", opacity: saving ? 0.7 : 1 }}>
                   {saving ? "Saving..." : "Save Profile"}
                 </button>
-                {saved && <span style={{ color: "var(--green)", fontSize: 14, fontWeight: 600 }}>✓ Saved!</span>}
+                {saved && <span style={{ color: "var(--green)", fontSize: 14, fontWeight: 600 }}>Saved!</span>}
               </div>
             </form>
           </div>
@@ -232,44 +243,104 @@ export default function Settings() {
 
         {/* Payouts Tab */}
         {tab === "payouts" && (
-          <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
-            <div style={{ padding: "14px 24px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>Payout Account</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+            {/* Subaccount / payout setup */}
+            <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+              <div style={{ padding: "14px 24px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>Payout Account</div>
+              {onboardingComplete && (
+                <div style={{ margin: 24, marginBottom: 0, background: "var(--green-light)", border: "1px solid #b8dfc9", borderRadius: 10, padding: "16px 20px" }}>
+                  <div style={{ fontWeight: 700, color: "var(--green)", marginBottom: 8 }}>Payout account connected</div>
+                  <div style={{ fontSize: 13, color: "#2e7d52", lineHeight: 1.9 }}>
+                    <span style={{ color: "#1a6b4a" }}>Bank: </span><strong>{bankName}</strong><br />
+                    <span style={{ color: "#1a6b4a" }}>Account No: </span><strong style={{ fontFamily: "monospace", letterSpacing: 1 }}>{accountNumber}</strong><br />
+                    <span style={{ color: "#1a6b4a" }}>Account Name: </span><strong>{accountName}</strong>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#2e7d52", marginTop: 8, fontFamily: "monospace" }}>Subaccount: {subaccountCode}</div>
+                </div>
+              )}
+              <form onSubmit={handleSavePayout} style={{ padding: 24 }}>
+                <div style={{ background: "#fff8e8", border: "1px solid #f0d080", borderRadius: 8, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#7a5500" }}>
+                  Invoice payments go directly to this bank account. Platform deducts 2% automatically.
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={labelStyle}>Bank</label>
+                  <select value={bankCode} onChange={e => { const s = banks.find(b => b.code === e.target.value); setBankCode(e.target.value); setBankName(s?.name ?? ""); setAccountName(""); }} style={inputStyle} required>
+                    <option value="">Select your bank...</option>
+                    {banks.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
+                  </select>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={labelStyle}>Account Number</label>
+                  <input value={accountNumber} onChange={e => setAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 10))} style={inputStyle} placeholder="10-digit account number" maxLength={10} required />
+                </div>
+                <div style={{ marginBottom: 24 }}>
+                  <label style={labelStyle}>Account Name</label>
+                  <div style={{ padding: "10px 12px", border: "1.5px solid var(--border)", borderRadius: 8, fontSize: 14, background: "#faf9f7", color: accountName ? "var(--green)" : "var(--muted)", fontWeight: accountName ? 700 : 400 }}>
+                    {resolving ? "Verifying..." : accountName || resolveError || "Auto-fills after entering account number"}
+                  </div>
+                  {resolveError && <div style={{ color: "#cc2222", fontSize: 12, marginTop: 4 }}>{resolveError}</div>}
+                </div>
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                  <button type="submit" disabled={savingPayout || !accountName || resolving} style={{ padding: "11px 28px", background: "var(--green)", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: savingPayout || !accountName ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", opacity: savingPayout || !accountName ? 0.7 : 1 }}>
+                    {savingPayout ? "Setting up..." : onboardingComplete ? "Update Payout Account" : "Connect Payout Account"}
+                  </button>
+                  {payoutSaved && <span style={{ color: "var(--green)", fontSize: 14, fontWeight: 600 }}>Connected!</span>}
+                </div>
+              </form>
+            </div>
+
+            {/* DVA Section — only show after payout account is connected */}
             {onboardingComplete && (
-              <div style={{ margin: 24, background: "var(--green-light)", border: "1px solid #b8dfc9", borderRadius: 10, padding: "16px 20px" }}>
-                <div style={{ fontWeight: 700, color: "var(--green)", marginBottom: 4 }}>✅ Payout account connected</div>
-                <div style={{ fontSize: 13, color: "#2e7d52" }}>{accountName} · {bankName} · ****{accountNumber.slice(-4)}</div>
-                <div style={{ fontSize: 12, color: "#2e7d52", marginTop: 4, fontFamily: "monospace" }}>Subaccount: {subaccountCode}</div>
+              <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+                <div style={{ padding: "14px 24px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>Virtual Account (for direct bank transfers)</div>
+
+                {dvaAccountNumber ? (
+                  <div style={{ padding: 24 }}>
+                    <div style={{ background: "#e8f0ff", border: "1px solid #b8c8ff", borderRadius: 10, padding: "16px 20px" }}>
+                      <div style={{ fontWeight: 700, color: "#2255cc", marginBottom: 8 }}>Virtual account active</div>
+                      <div style={{ fontSize: 13, color: "#1a1a1a", lineHeight: 1.9 }}>
+                        <span style={{ color: "#555" }}>Bank: </span><strong>{dvaBank}</strong><br />
+                        <span style={{ color: "#555" }}>Account No: </span><strong style={{ fontFamily: "monospace", fontSize: 15, letterSpacing: 1 }}>{dvaAccountNumber}</strong><br />
+                        <span style={{ color: "#555" }}>Account Name: </span><strong>{dvaAccountName}</strong>
+                      </div>
+                      <div style={{ fontSize: 11, color: "#2255cc", marginTop: 8 }}>This account appears on all your invoices. Any transfer to it triggers automatic receipt generation and BizDoc earns its 2% split.</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: 24 }}>
+                    <div style={{ background: "#e8f0ff", border: "1px solid #b8c8ff", borderRadius: 8, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#2255cc" }}>
+                      A dedicated virtual account lets clients pay by direct bank transfer or USSD and still triggers automatic receipt generation. All transfers are tracked by Paystack.
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
+                      <div>
+                        <label style={labelStyle}>First Name</label>
+                        <input value={dvaFirstName} onChange={e => setDvaFirstName(e.target.value)} style={inputStyle} placeholder="Your first name" />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Last Name</label>
+                        <input value={dvaLastName} onChange={e => setDvaLastName(e.target.value)} style={inputStyle} placeholder="Your last name" />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Email</label>
+                        <input value={dvaEmail} onChange={e => setDvaEmail(e.target.value)} style={inputStyle} placeholder="your@email.com" />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Preferred Bank</label>
+                        <select value={dvaPreferredBank} onChange={e => setDvaPreferredBank(e.target.value)} style={inputStyle}>
+                          <option value="wema-bank">Wema Bank (ALAT)</option>
+                          <option value="titan-paystack">Titan Trust Bank</option>
+                        </select>
+                      </div>
+                    </div>
+                    {dvaError && <div style={{ background: "#fff0f0", border: "1px solid #ffcccc", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#cc2222", marginBottom: 16 }}>{dvaError}</div>}
+                    <button type="button" onClick={handleCreateDVA} disabled={creatingDva || !dvaFirstName || !dvaLastName || !dvaEmail} style={{ padding: "11px 24px", background: "#2255cc", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: creatingDva || !dvaFirstName || !dvaLastName || !dvaEmail ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", opacity: creatingDva || !dvaFirstName || !dvaLastName || !dvaEmail ? 0.7 : 1 }}>
+                      {creatingDva ? "Creating..." : "Generate Virtual Account"}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
-            <form onSubmit={handleSavePayout} style={{ padding: 24 }}>
-              <div style={{ background: "#fff8e8", border: "1px solid #f0d080", borderRadius: 8, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#7a5500" }}>
-                💡 Invoice payments go directly to this bank account. Platform deducts <strong>2%</strong> automatically.
-              </div>
-              <div style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>Bank</label>
-                <select value={bankCode} onChange={e => { const s = banks.find(b => b.code === e.target.value); setBankCode(e.target.value); setBankName(s?.name ?? ""); setAccountName(""); }} style={inputStyle} required>
-                  <option value="">Select your bank...</option>
-                  {banks.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
-                </select>
-              </div>
-              <div style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>Account Number</label>
-                <input value={accountNumber} onChange={e => setAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 10))} style={inputStyle} placeholder="10-digit account number" maxLength={10} required />
-              </div>
-              <div style={{ marginBottom: 24 }}>
-                <label style={labelStyle}>Account Name</label>
-                <div style={{ padding: "10px 12px", border: "1.5px solid var(--border)", borderRadius: 8, fontSize: 14, background: "#faf9f7", color: accountName ? "var(--green)" : "var(--muted)", fontWeight: accountName ? 700 : 400 }}>
-                  {resolving ? "Verifying..." : accountName || resolveError || "Auto-fills after entering account number"}
-                </div>
-                {resolveError && <div style={{ color: "#cc2222", fontSize: 12, marginTop: 4 }}>{resolveError}</div>}
-              </div>
-              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <button type="submit" disabled={savingPayout || !accountName || resolving} style={{ padding: "11px 28px", background: "var(--green)", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: savingPayout || !accountName ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", opacity: savingPayout || !accountName ? 0.7 : 1 }}>
-                  {savingPayout ? "Setting up..." : onboardingComplete ? "Update Payout Account" : "Connect Payout Account"}
-                </button>
-                {payoutSaved && <span style={{ color: "var(--green)", fontSize: 14, fontWeight: 600 }}>✓ Connected!</span>}
-              </div>
-            </form>
           </div>
         )}
       </div>

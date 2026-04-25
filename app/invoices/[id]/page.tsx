@@ -20,7 +20,7 @@ export default function InvoiceDetail() {
   const router = useRouter();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
-  const [business, setBusiness] = useState<{ name: string; email: string; phone: string; address: string; logo_url: string } | null>(null);
+  const [business, setBusiness] = useState<{ name: string; email: string; phone: string; address: string; logo_url: string; account_name: string; account_number: string; bank_name: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [sendingLink, setSendingLink] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -43,7 +43,6 @@ export default function InvoiceDetail() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Generate QR code whenever payment_url is available
   useEffect(() => {
     if (!invoice?.payment_url) return;
     const payUrl = `${window.location.origin}/invoices/${id}/pay`;
@@ -91,7 +90,6 @@ export default function InvoiceDetail() {
         }
       `}</style>
 
-      {/* Nav */}
       <nav className="no-print" style={{ background: "var(--green)", padding: "0 28px", height: 60, display: "flex", alignItems: "center", gap: 16 }}>
         <Link href="/dashboard">
           <button style={{ background: "none", border: "none", color: "white", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>←</button>
@@ -101,7 +99,7 @@ export default function InvoiceDetail() {
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={handlePrint} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "7px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>
-            🖨 Print
+            Print
           </button>
           {invoice.status === "paid" && receipt && (
             <Link href={`/invoices/${id}/receipt`}>
@@ -124,18 +122,25 @@ export default function InvoiceDetail() {
               </div>
               <div style={{ color: "var(--muted)", fontSize: 13 }}>
                 {invoice.status === "draft"
-                  ? "Generate a Paystack payment link and email it to your client."
+                  ? invoice.client_email
+                    ? "Generate a Paystack payment link and email it to your client."
+                    : "No client email — you can still print this invoice with bank transfer details."
                   : `Payment URL: ${invoice.payment_url?.slice(0, 48)}...`}
               </div>
             </div>
-            <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               {invoice.payment_url && (
                 <button onClick={copyLink} style={{ padding: "9px 18px", background: copied ? "var(--green-light)" : "#f5f2ed", color: copied ? "var(--green)" : "var(--text)", border: "1.5px solid var(--border)", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "var(--font-body)" }}>
                   {copied ? "✓ Copied!" : "Copy Link"}
                 </button>
               )}
-              <button onClick={generatePaymentLink} disabled={sendingLink} style={{ padding: "9px 20px", background: "var(--green)", color: "white", border: "none", borderRadius: 8, cursor: sendingLink ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 700, fontFamily: "var(--font-body)", opacity: sendingLink ? 0.7 : 1 }}>
-                {sendingLink ? "Generating..." : invoice.payment_url ? "Resend Invoice" : "Generate & Send →"}
+              {invoice.client_email && (
+                <button onClick={generatePaymentLink} disabled={sendingLink} style={{ padding: "9px 20px", background: "var(--green)", color: "white", border: "none", borderRadius: 8, cursor: sendingLink ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 700, fontFamily: "var(--font-body)", opacity: sendingLink ? 0.7 : 1 }}>
+                  {sendingLink ? "Generating..." : invoice.payment_url ? "Resend Invoice" : "Generate & Send →"}
+                </button>
+              )}
+              <button onClick={handlePrint} style={{ padding: "9px 18px", background: "#f5f2ed", color: "var(--text)", border: "1.5px solid var(--border)", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "var(--font-body)" }}>
+                Print Invoice
               </button>
             </div>
           </div>
@@ -148,7 +153,8 @@ export default function InvoiceDetail() {
             <div>
               <div style={{ fontWeight: 700, color: "var(--green)", fontSize: 15 }}>Payment Received</div>
               <div style={{ fontSize: 13, color: "#2e7d52" }}>
-                Paid on {invoice.paid_at ? new Date(invoice.paid_at).toLocaleString("en-NG") : "—"} · Receipt auto-emailed to {invoice.client_email}
+                Paid on {invoice.paid_at ? new Date(invoice.paid_at).toLocaleString("en-NG") : "—"}
+                {invoice.client_email && ` · Receipt auto-emailed to ${invoice.client_email}`}
               </div>
             </div>
           </div>
@@ -164,7 +170,7 @@ export default function InvoiceDetail() {
               <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, color: "white" }}>{business?.name || "Your Business"}</div>
               <div style={{ color: "#a8d5b5", fontSize: 13, marginTop: 4, lineHeight: 1.7 }}>
                 {business?.address && <span>{business.address}<br /></span>}
-                {business?.email}<br />
+                {business?.email && <span>{business.email}<br /></span>}
                 {business?.phone}
               </div>
             </div>
@@ -200,7 +206,9 @@ export default function InvoiceDetail() {
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "1px", color: "var(--muted)", marginBottom: 8 }}>From</div>
               <div style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700 }}>{business?.name || "—"}</div>
               <div style={{ color: "#555", fontSize: 13, lineHeight: 1.7, marginTop: 4 }}>
-                {business?.address}<br />{business?.email}<br />{business?.phone}
+                {business?.address && <>{business.address}<br /></>}
+                {business?.email && <>{business.email}<br /></>}
+                {business?.phone}
               </div>
             </div>
             <div>
@@ -238,10 +246,8 @@ export default function InvoiceDetail() {
             </table>
           </div>
 
-          {/* Totals + QR Code side by side */}
+          {/* Totals + QR Code */}
           <div style={{ padding: "20px 32px", display: "flex", justifyContent: "space-between", alignItems: "flex-end", borderTop: "1px solid var(--border)", flexWrap: "wrap", gap: 20 }}>
-
-            {/* QR Code — only show if payment link exists and invoice not paid */}
             {qrDataUrl && invoice.status !== "paid" ? (
               <div style={{ textAlign: "center" }}>
                 <img src={qrDataUrl} alt="Payment QR Code" style={{ width: 120, height: 120, borderRadius: 8, border: "2px solid var(--green-light)" }} />
@@ -257,12 +263,11 @@ export default function InvoiceDetail() {
               <div style={{ width: 120 }} />
             )}
 
-            {/* Totals */}
             <div style={{ minWidth: 260 }}>
               {[
                 ["Subtotal", formatCurrency(invoice.subtotal, invoice.currency)],
-                invoice.discount_amount > 0 ? ["Discount", `−${formatCurrency(invoice.discount_amount, invoice.currency)}`] : null,
-                invoice.tax_amount > 0 ? [`Tax (${invoice.tax_rate}%)`, formatCurrency(invoice.tax_amount, invoice.currency)] : null,
+                invoice.discount_amount > 0 ? ["Discount", "-" + formatCurrency(invoice.discount_amount, invoice.currency)] : null,
+                invoice.tax_amount > 0 ? ["Tax (" + invoice.tax_rate + "%)", formatCurrency(invoice.tax_amount, invoice.currency)] : null,
               ].filter(Boolean).map(([label, val]) => (
                 <div key={label as string} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--muted)", padding: "4px 0" }}>
                   <span>{label}</span><span>{val as string}</span>
@@ -274,13 +279,37 @@ export default function InvoiceDetail() {
             </div>
           </div>
 
-          {/* Notes & payment info */}
-          {(invoice.notes || invoice.payment_info) && (
-            <div style={{ padding: "20px 32px", borderTop: "1px solid var(--border)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-              {invoice.notes && <div><div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "1px", color: "var(--muted)", marginBottom: 6 }}>Notes</div><div style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>{invoice.notes}</div></div>}
-              {invoice.payment_info && <div><div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "1px", color: "var(--muted)", marginBottom: 6 }}>Payment Instructions</div><div style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>{invoice.payment_info}</div></div>}
+          {/* Notes + Payment Options (bank details) */}
+          <div style={{ padding: "20px 32px", borderTop: "1px solid var(--border)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+            <div>
+              {invoice.notes && (
+                <>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "1px", color: "var(--muted)", marginBottom: 6 }}>Notes</div>
+                  <div style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>{invoice.notes}</div>
+                </>
+              )}
             </div>
-          )}
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "1px", color: "var(--muted)", marginBottom: 8 }}>Payment Options</div>
+              {business?.account_name ? (
+                <div style={{ background: "var(--green-light)", border: "1px solid #b8dfc9", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--green)", marginBottom: 6, textTransform: "uppercase" as const, letterSpacing: "0.8px" }}>Bank Transfer / USSD</div>
+                  <div style={{ fontSize: 13, color: "#1a1a1a", lineHeight: 2 }}>
+                    <span style={{ color: "var(--muted)" }}>Bank: </span><strong>{business.bank_name}</strong><br />
+                    <span style={{ color: "var(--muted)" }}>Account No: </span><strong style={{ fontFamily: "monospace", fontSize: 15, letterSpacing: 1 }}>{business.account_number}</strong><br />
+                    <span style={{ color: "var(--muted)" }}>Account Name: </span><strong>{business.account_name}</strong>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: "var(--muted)" }}>
+                  {invoice.payment_info || "No bank details added. Go to Settings → Payout Account to add."}
+                </div>
+              )}
+              {invoice.payment_info && business?.account_name && (
+                <div style={{ fontSize: 13, color: "#555", lineHeight: 1.7, marginTop: 8 }}>{invoice.payment_info}</div>
+              )}
+            </div>
+          </div>
 
           {/* Pay button */}
           {invoice.payment_url && invoice.status !== "paid" && (

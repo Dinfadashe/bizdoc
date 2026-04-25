@@ -132,6 +132,65 @@ export async function getBanks() {
   return data.data as { name: string; code: string; slug: string }[];
 }
 
+export async function createDedicatedVirtualAccount({
+  firstName,
+  lastName,
+  email,
+  phone,
+  preferredBank = "wema-bank",
+}: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  preferredBank?: string;
+}) {
+  // Step 1 — Create a Paystack customer
+  const customerRes = await fetch(`${BASE}/customer`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      email,
+      first_name: firstName,
+      last_name: lastName,
+      phone: phone ?? "",
+    }),
+  });
+  const customerData = await customerRes.json();
+  if (!customerData.status) throw new Error(customerData.message ?? "Failed to create customer");
+
+  const customerCode = customerData.data.customer_code;
+
+  // Step 2 — Assign a dedicated virtual account
+  const dvaRes = await fetch(`${BASE}/dedicated_account`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      customer: customerCode,
+      preferred_bank: preferredBank,
+    }),
+  });
+
+  const dvaData = await dvaRes.json();
+  if (!dvaData.status) throw new Error(dvaData.message ?? "Failed to create virtual account");
+
+  return {
+    bank: dvaData.data.bank?.name as string,
+    account_number: dvaData.data.account_number as string,
+    account_name: dvaData.data.account_name as string,
+    dva_reference: customerCode as string,
+  };
+}
+
+export async function getDVABanks() {
+  const res = await fetch(`${BASE}/dedicated_account/available_providers`, {
+    headers: headers(),
+  });
+  const data = await res.json();
+  if (!data.status) throw new Error("Could not fetch DVA banks");
+  return data.data as { provider_slug: string; bank_name: string; id: number }[];
+}
+
 export function verifyWebhookSignature(body: string, signature: string): boolean {
   const crypto = require("crypto");
   const hash = crypto

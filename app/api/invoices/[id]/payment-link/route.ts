@@ -28,7 +28,9 @@ export async function POST(
       .single();
 
     if (!invoice.client_email) {
-      return NextResponse.json({ error: "Client email required" }, { status: 400 });
+      return NextResponse.json({
+        error: "Client email is required to send a payment link. You can still print the invoice with bank transfer details.",
+      }, { status: 400 });
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
