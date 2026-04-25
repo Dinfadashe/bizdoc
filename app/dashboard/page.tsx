@@ -16,17 +16,18 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 
 export default function Dashboard() {
   const [user, setUser] = useState<{ id: string; email?: string } | null>(null);
+  const [business, setBusiness] = useState<{ name: string; logo_url: string; onboarding_complete: boolean } | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   const load = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from("invoices")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false });
-    setInvoices(data ?? []);
+    const [{ data: invData }, { data: bizData }] = await Promise.all([
+      supabase.from("invoices").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+      supabase.from("businesses").select("name, logo_url, onboarding_complete").eq("user_id", userId).single(),
+    ]);
+    setInvoices(invData ?? []);
+    setBusiness(bizData);
     setLoading(false);
   }, []);
 
@@ -50,18 +51,46 @@ export default function Dashboard() {
     <div style={{ minHeight: "100vh", background: "var(--cream)" }}>
       {/* Nav */}
       <nav style={{ background: "var(--green)", padding: "0 28px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, color: "white" }}>BizDoc</div>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <span style={{ color: "#a8d5b5", fontSize: 13 }}>{user?.email}</span>
-          <button onClick={signOut} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>Sign Out</button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {business?.logo_url && (
+            <img src={business.logo_url} alt="logo" style={{ width: 32, height: 32, borderRadius: 6, objectFit: "contain", background: "white", padding: 2 }} />
+          )}
+          <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, color: "white" }}>
+            {business?.name || "BizDoc"}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <Link href="/settings">
+            <button style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>
+              ⚙ Settings
+            </button>
+          </Link>
+          <button onClick={signOut} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>
+            Sign Out
+          </button>
         </div>
       </nav>
 
       <div style={{ maxWidth: 900, margin: "0 auto", padding: "32px 20px" }}>
+
+        {/* Incomplete profile warning */}
+        {business && !business.onboarding_complete && (
+          <div style={{ background: "#fff8e8", border: "1px solid #f0d080", borderRadius: 10, padding: "14px 20px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+            <div style={{ fontSize: 14, color: "#7a5500" }}>
+              ⚠️ <strong>Connect your payout account</strong> — add your bank details so invoice payments reach you.
+            </div>
+            <Link href="/settings?tab=payouts">
+              <button style={{ background: "#b36000", color: "white", border: "none", padding: "7px 16px", borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)" }}>
+                Set Up Payouts →
+              </button>
+            </Link>
+          </div>
+        )}
+
         {/* Stats */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 28 }}>
           {[
-            { label: "Total Invoices", value: invoices.length, mono: false },
+            { label: "Total Invoices", value: String(invoices.length), mono: false },
             { label: "Revenue Collected", value: formatCurrency(totalPaid), mono: true },
             { label: "Pending Payment", value: formatCurrency(totalPending), mono: true },
           ].map((s) => (
@@ -99,7 +128,7 @@ export default function Dashboard() {
             {invoices.map((inv, idx) => {
               const sc = STATUS_COLORS[inv.status] ?? STATUS_COLORS.draft;
               return (
-                <Link key={inv.id} href={`/invoices/${inv.id}`} style={{ display: "flex", alignItems: "center", padding: "16px 22px", borderBottom: idx < invoices.length - 1 ? "1px solid var(--border)" : "none", gap: 16, cursor: "pointer", transition: "background 0.15s", textDecoration: "none", color: "inherit" }}>
+                <Link key={inv.id} href={`/invoices/${inv.id}`} style={{ display: "flex", alignItems: "center", padding: "16px 22px", borderBottom: idx < invoices.length - 1 ? "1px solid var(--border)" : "none", gap: 16, cursor: "pointer", textDecoration: "none", color: "inherit" }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, fontSize: 15 }}>{inv.invoice_number}</div>
                     <div style={{ color: "var(--muted)", fontSize: 13, marginTop: 2 }}>{inv.client_name || "No client"} · {new Date(inv.issue_date).toDateString()}</div>

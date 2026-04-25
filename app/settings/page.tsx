@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -12,8 +12,15 @@ export default function Settings() {
   const [bizId, setBizId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [tab, setTab] = useState<"profile" | "payouts">("profile");
+  const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const [tab, setTab] = useState<"profile" | "payouts">(searchParams?.get("tab") === "payouts" ? "payouts" : "profile");
   const [form, setForm] = useState({ name: "", email: "", phone: "", address: "", currency: "NGN", logo_url: "" });
+  const [logoPreview, setLogoPreview] = useState<string>("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoError, setLogoError] = useState("");
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  // Payout fields
   const [banks, setBanks] = useState<Bank[]>([]);
   const [bankCode, setBankCode] = useState("");
   const [bankName, setBankName] = useState("");
@@ -34,6 +41,7 @@ export default function Settings() {
       if (biz) {
         setBizId(biz.id);
         setForm({ name: biz.name ?? "", email: biz.email ?? "", phone: biz.phone ?? "", address: biz.address ?? "", currency: biz.currency ?? "NGN", logo_url: biz.logo_url ?? "" });
+        setLogoPreview(biz.logo_url ?? "");
         setBankCode(biz.bank_code ?? "");
         setBankName(biz.bank_name ?? "");
         setAccountNumber(biz.account_number ?? "");
@@ -44,6 +52,44 @@ export default function Settings() {
     });
     fetch("/api/banks").then(r => r.json()).then(d => setBanks(d.banks ?? [])).catch(() => {});
   }, [router]);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !userId) return;
+
+    // Validate file type and size
+    if (!file.type.startsWith("image/")) { setLogoError("Please upload an image file."); return; }
+    if (file.size > 2 * 1024 * 1024) { setLogoError("Image must be under 2MB."); return; }
+
+    setUploadingLogo(true);
+    setLogoError("");
+
+    // Show local preview immediately
+    const localUrl = URL.createObjectURL(file);
+    setLogoPreview(localUrl);
+
+    // Upload to Supabase Storage
+    const ext = file.name.split(".").pop();
+    const path = `${userId}/logo.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("logos")
+      .upload(path, file, { upsert: true });
+
+    if (uploadError) {
+      setLogoError("Upload failed: " + uploadError.message);
+      setUploadingLogo(false);
+      return;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage.from("logos").getPublicUrl(path);
+    const publicUrl = urlData.publicUrl;
+
+    setForm(f => ({ ...f, logo_url: publicUrl }));
+    setLogoPreview(publicUrl);
+    setUploadingLogo(false);
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,19 +152,59 @@ export default function Settings() {
         <Link href="/dashboard"><button style={{ background: "none", border: "none", color: "white", cursor: "pointer", fontSize: 20 }}>←</button></Link>
         <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, color: "white" }}>Settings</div>
       </nav>
+
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "32px 20px" }}>
+
+        {/* Tabs */}
         <div style={{ display: "flex", background: "#e8e4de", borderRadius: 10, padding: 4, gap: 4, marginBottom: 24 }}>
           {(["profile", "payouts"] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "10px", border: "none", borderRadius: 7, fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "var(--font-body)", background: tab === t ? "white" : "transparent", color: tab === t ? "var(--green)" : "var(--muted)", boxShadow: tab === t ? "0 1px 3px rgba(0,0,0,0.1)" : "none", textTransform: "capitalize" }}>
+            <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "10px", border: "none", borderRadius: 7, fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "var(--font-body)", background: tab === t ? "white" : "transparent", color: tab === t ? "var(--green)" : "var(--muted)", boxShadow: tab === t ? "0 1px 3px rgba(0,0,0,0.1)" : "none" }}>
               {t === "payouts" ? "💳 Payout Account" : "🏢 Business Profile"}
             </button>
           ))}
         </div>
 
+        {/* Profile Tab */}
         {tab === "profile" && (
           <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
-            <div style={{ padding: "14px 24px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>Business Profile</div>
+            <div style={{ padding: "14px 24px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>
+              Business Profile
+            </div>
             <form onSubmit={handleSaveProfile} style={{ padding: 24 }}>
+
+              {/* Logo upload */}
+              <div style={{ marginBottom: 24 }}>
+                <label style={labelStyle}>Business Logo</label>
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                  {/* Preview */}
+                  <div onClick={() => logoInputRef.current?.click()} style={{ width: 80, height: 80, borderRadius: 12, border: "2px dashed var(--border)", background: "#faf9f7", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", overflow: "hidden", flexShrink: 0, position: "relative" }}>
+                    {logoPreview ? (
+                      <img src={logoPreview} alt="logo" style={{ width: "100%", height: "100%", objectFit: "contain", padding: 6 }} />
+                    ) : (
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: 24 }}>🏢</div>
+                        <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>Click to upload</div>
+                      </div>
+                    )}
+                    {uploadingLogo && (
+                      <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.8)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "var(--green)", fontWeight: 700 }}>
+                        Uploading...
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Upload button */}
+                  <div>
+                    <button type="button" onClick={() => logoInputRef.current?.click()} style={{ padding: "9px 18px", background: "var(--green-light)", color: "var(--green)", border: "1.5px solid #b8dfc9", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", display: "block", marginBottom: 6 }}>
+                      {logoPreview ? "Change Logo" : "Upload Logo"}
+                    </button>
+                    <div style={{ fontSize: 11, color: "var(--muted)" }}>PNG, JPG or SVG · Max 2MB</div>
+                    {logoError && <div style={{ fontSize: 11, color: "#cc2222", marginTop: 4 }}>{logoError}</div>}
+                  </div>
+                </div>
+                <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleLogoUpload} />
+              </div>
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                 <div><label style={labelStyle}>Business Name</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={inputStyle} required /></div>
                 <div><label style={labelStyle}>Email</label><input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} style={inputStyle} /></div>
@@ -129,14 +215,13 @@ export default function Settings() {
                   </select>
                 </div>
               </div>
-              <div style={{ marginBottom: 16 }}><label style={labelStyle}>Address</label><input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} style={inputStyle} /></div>
               <div style={{ marginBottom: 24 }}>
-                <label style={labelStyle}>Logo URL</label>
-                <input value={form.logo_url} onChange={e => setForm({ ...form, logo_url: e.target.value })} style={inputStyle} placeholder="https://..." />
-                {form.logo_url && <img src={form.logo_url} alt="logo" style={{ marginTop: 10, width: 60, height: 60, objectFit: "contain", borderRadius: 8, border: "1px solid var(--border)" }} />}
+                <label style={labelStyle}>Address</label>
+                <input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} style={inputStyle} />
               </div>
+
               <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <button type="submit" disabled={saving} style={{ padding: "11px 28px", background: "var(--green)", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", opacity: saving ? 0.7 : 1 }}>
+                <button type="submit" disabled={saving || uploadingLogo} style={{ padding: "11px 28px", background: "var(--green)", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", opacity: saving ? 0.7 : 1 }}>
                   {saving ? "Saving..." : "Save Profile"}
                 </button>
                 {saved && <span style={{ color: "var(--green)", fontSize: 14, fontWeight: 600 }}>✓ Saved!</span>}
@@ -145,6 +230,7 @@ export default function Settings() {
           </div>
         )}
 
+        {/* Payouts Tab */}
         {tab === "payouts" && (
           <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
             <div style={{ padding: "14px 24px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>Payout Account</div>
