@@ -20,7 +20,7 @@ export default function InvoiceDetail() {
   const router = useRouter();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
-  const [business, setBusiness] = useState<{ name: string; email: string; phone: string; address: string; logo_url: string; account_name: string; account_number: string; bank_name: string } | null>(null);
+  const [business, setBusiness] = useState<{ name: string; email: string; phone: string; address: string; logo_url: string; account_name: string; account_number: string; bank_name: string; dva_account_number: string; dva_account_name: string; dva_bank: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [sendingLink, setSendingLink] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -31,13 +31,10 @@ export default function InvoiceDetail() {
     const { data: inv } = await supabase.from("invoices").select("*").eq("id", id).single();
     if (!inv) { router.push("/dashboard"); return; }
     setInvoice(inv);
-
     const { data: biz } = await supabase.from("businesses").select("*").eq("user_id", inv.user_id).single();
     setBusiness(biz);
-
     const { data: rec } = await supabase.from("receipts").select("*").eq("invoice_id", id).single();
     setReceipt(rec);
-
     setLoading(false);
   }, [id, router]);
 
@@ -86,7 +83,14 @@ export default function InvoiceDetail() {
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          body { background: white !important; }
+          body { background: white !important; margin: 0 !important; padding: 0 !important; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+          @page { margin: 0.4cm; size: A4 portrait; }
+          #invoice-doc { box-shadow: none !important; border-radius: 0 !important; border: none !important; }
+          div[style*="maxWidth: 820"] { padding: 0 !important; max-width: 100% !important; }
+          table { page-break-inside: avoid !important; }
+          tr { page-break-inside: avoid !important; }
+          img { max-width: 100% !important; }
         }
       `}</style>
 
@@ -113,7 +117,6 @@ export default function InvoiceDetail() {
 
       <div style={{ maxWidth: 820, margin: "0 auto", padding: "28px 20px" }}>
 
-        {/* Action banner */}
         {invoice.status !== "paid" && invoice.status !== "cancelled" && (
           <div className="no-print" style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", padding: "20px 24px", marginBottom: 20, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
             <div style={{ flex: 1 }}>
@@ -131,12 +134,12 @@ export default function InvoiceDetail() {
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               {invoice.payment_url && (
                 <button onClick={copyLink} style={{ padding: "9px 18px", background: copied ? "var(--green-light)" : "#f5f2ed", color: copied ? "var(--green)" : "var(--text)", border: "1.5px solid var(--border)", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "var(--font-body)" }}>
-                  {copied ? "✓ Copied!" : "Copy Link"}
+                  {copied ? "Copied!" : "Copy Link"}
                 </button>
               )}
               {invoice.client_email && (
                 <button onClick={generatePaymentLink} disabled={sendingLink} style={{ padding: "9px 20px", background: "var(--green)", color: "white", border: "none", borderRadius: 8, cursor: sendingLink ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 700, fontFamily: "var(--font-body)", opacity: sendingLink ? 0.7 : 1 }}>
-                  {sendingLink ? "Generating..." : invoice.payment_url ? "Resend Invoice" : "Generate & Send →"}
+                  {sendingLink ? "Generating..." : invoice.payment_url ? "Resend Invoice" : "Generate & Send"}
                 </button>
               )}
               <button onClick={handlePrint} style={{ padding: "9px 18px", background: "#f5f2ed", color: "var(--text)", border: "1.5px solid var(--border)", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "var(--font-body)" }}>
@@ -146,7 +149,6 @@ export default function InvoiceDetail() {
           </div>
         )}
 
-        {/* Paid banner */}
         {invoice.status === "paid" && (
           <div className="no-print" style={{ background: "var(--green-light)", borderRadius: 12, border: "1px solid #b8dfc9", padding: "16px 24px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
             <span style={{ fontSize: 24 }}>✅</span>
@@ -160,10 +162,8 @@ export default function InvoiceDetail() {
           </div>
         )}
 
-        {/* Invoice document */}
-        <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+        <div id="invoice-doc" style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
 
-          {/* Header */}
           <div style={{ background: "var(--green)", padding: "28px 32px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
             <div>
               {business?.logo_url && <img src={business.logo_url} alt="logo" style={{ width: 56, height: 56, objectFit: "contain", borderRadius: 8, marginBottom: 10 }} />}
@@ -185,7 +185,6 @@ export default function InvoiceDetail() {
             </div>
           </div>
 
-          {/* Meta strip */}
           <div style={{ background: "#faf9f7", padding: "14px 32px", display: "flex", gap: 32, flexWrap: "wrap", borderBottom: "1px solid var(--border)" }}>
             {[
               ["Issue Date", new Date(invoice.issue_date).toDateString()],
@@ -200,7 +199,6 @@ export default function InvoiceDetail() {
             ))}
           </div>
 
-          {/* Parties */}
           <div style={{ padding: "24px 32px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, borderBottom: "1px solid var(--border)" }}>
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "1px", color: "var(--muted)", marginBottom: 8 }}>From</div>
@@ -222,7 +220,6 @@ export default function InvoiceDetail() {
             </div>
           </div>
 
-          {/* Items table */}
           <div style={{ padding: "0 32px" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
@@ -246,7 +243,6 @@ export default function InvoiceDetail() {
             </table>
           </div>
 
-          {/* Totals + QR Code */}
           <div style={{ padding: "20px 32px", display: "flex", justifyContent: "space-between", alignItems: "flex-end", borderTop: "1px solid var(--border)", flexWrap: "wrap", gap: 20 }}>
             {qrDataUrl && invoice.status !== "paid" ? (
               <div style={{ textAlign: "center" }}>
@@ -262,7 +258,6 @@ export default function InvoiceDetail() {
             ) : (
               <div style={{ width: 120 }} />
             )}
-
             <div style={{ minWidth: 260 }}>
               {[
                 ["Subtotal", formatCurrency(invoice.subtotal, invoice.currency)],
@@ -279,7 +274,6 @@ export default function InvoiceDetail() {
             </div>
           </div>
 
-          {/* Notes + Payment Options (bank details) */}
           <div style={{ padding: "20px 32px", borderTop: "1px solid var(--border)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
             <div>
               {invoice.notes && (
@@ -291,7 +285,17 @@ export default function InvoiceDetail() {
             </div>
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "1px", color: "var(--muted)", marginBottom: 8 }}>Payment Options</div>
-              {business?.account_name ? (
+              {business?.dva_account_number ? (
+                <div style={{ background: "#e8f0ff", border: "1px solid #b8c8ff", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#2255cc", marginBottom: 6, textTransform: "uppercase" as const, letterSpacing: "0.8px" }}>Bank Transfer / USSD</div>
+                  <div style={{ fontSize: 13, color: "#1a1a1a", lineHeight: 2 }}>
+                    <span style={{ color: "var(--muted)" }}>Bank: </span><strong>{business.dva_bank}</strong><br />
+                    <span style={{ color: "var(--muted)" }}>Account No: </span><strong style={{ fontFamily: "monospace", fontSize: 15, letterSpacing: 1 }}>{business.dva_account_number}</strong><br />
+                    <span style={{ color: "var(--muted)" }}>Account Name: </span><strong>{business.dva_account_name}</strong>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#2255cc", marginTop: 6 }}>Transfer exact amount — receipt will be sent automatically.</div>
+                </div>
+              ) : business?.account_name ? (
                 <div style={{ background: "var(--green-light)", border: "1px solid #b8dfc9", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "var(--green)", marginBottom: 6, textTransform: "uppercase" as const, letterSpacing: "0.8px" }}>Bank Transfer / USSD</div>
                   <div style={{ fontSize: 13, color: "#1a1a1a", lineHeight: 2 }}>
@@ -302,16 +306,15 @@ export default function InvoiceDetail() {
                 </div>
               ) : (
                 <div style={{ fontSize: 13, color: "var(--muted)" }}>
-                  {invoice.payment_info || "No bank details added. Go to Settings → Payout Account to add."}
+                  {invoice.payment_info || "No bank details added. Go to Settings to add."}
                 </div>
               )}
-              {invoice.payment_info && business?.account_name && (
+              {invoice.payment_info && (business?.dva_account_number || business?.account_name) && (
                 <div style={{ fontSize: 13, color: "#555", lineHeight: 1.7, marginTop: 8 }}>{invoice.payment_info}</div>
               )}
             </div>
           </div>
 
-          {/* Pay button */}
           {invoice.payment_url && invoice.status !== "paid" && (
             <div className="no-print" style={{ padding: "24px 32px", borderTop: "1px solid var(--border)", textAlign: "center", background: "var(--green-light)" }}>
               <a href={invoice.payment_url} target="_blank" rel="noreferrer">

@@ -36,10 +36,8 @@ export default function Settings() {
   const [dvaAccountNumber, setDvaAccountNumber] = useState("");
   const [dvaAccountName, setDvaAccountName] = useState("");
   const [dvaBank, setDvaBank] = useState("");
-  const [dvaFirstName, setDvaFirstName] = useState("");
-  const [dvaLastName, setDvaLastName] = useState("");
   const [dvaEmail, setDvaEmail] = useState("");
-  const [dvaPreferredBank, setDvaPreferredBank] = useState("wema-bank");
+  const [dvaPreferredBank, setDvaPreferredBank] = useState("titan-paystack");
   const [creatingDva, setCreatingDva] = useState(false);
   const [dvaError, setDvaError] = useState("");
 
@@ -61,7 +59,6 @@ export default function Settings() {
         setDvaAccountNumber(biz.dva_account_number ?? "");
         setDvaAccountName(biz.dva_account_name ?? "");
         setDvaBank(biz.dva_bank ?? "");
-        // Pre-fill DVA form with business email
         setDvaEmail(biz.email ?? "");
       }
     });
@@ -141,7 +138,7 @@ export default function Settings() {
   };
 
   const handleCreateDVA = async () => {
-    if (!userId) return;
+    if (!userId || !dvaEmail) return;
     setCreatingDva(true);
     setDvaError("");
     const res = await fetch("/api/dva", {
@@ -149,9 +146,8 @@ export default function Settings() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         user_id: userId,
-        first_name: dvaFirstName,
-        last_name: dvaLastName,
         email: dvaEmail,
+        phone: form.phone,
         preferred_bank: dvaPreferredBank,
       }),
     });
@@ -220,7 +216,7 @@ export default function Settings() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                 <div><label style={labelStyle}>Business Name</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={inputStyle} required /></div>
                 <div><label style={labelStyle}>Email</label><input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} style={inputStyle} /></div>
-                <div><label style={labelStyle}>Phone</label><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Phone</label><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} style={inputStyle} placeholder="+2348012345678" /></div>
                 <div><label style={labelStyle}>Default Currency</label>
                   <select value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} style={inputStyle}>
                     {["NGN", "USD", "GBP", "EUR"].map(c => <option key={c}>{c}</option>)}
@@ -245,7 +241,7 @@ export default function Settings() {
         {tab === "payouts" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-            {/* Subaccount / payout setup */}
+            {/* Payout account */}
             <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
               <div style={{ padding: "14px 24px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>Payout Account</div>
               {onboardingComplete && (
@@ -267,7 +263,7 @@ export default function Settings() {
                   <label style={labelStyle}>Bank</label>
                   <select value={bankCode} onChange={e => { const s = banks.find(b => b.code === e.target.value); setBankCode(e.target.value); setBankName(s?.name ?? ""); setAccountName(""); }} style={inputStyle} required>
                     <option value="">Select your bank...</option>
-                    {banks.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
+                    {banks.map((b, idx) => <option key={`${b.code}-${idx}`} value={b.code}>{b.name}</option>)}
                   </select>
                 </div>
                 <div style={{ marginBottom: 16 }}>
@@ -290,7 +286,7 @@ export default function Settings() {
               </form>
             </div>
 
-            {/* DVA Section — only show after payout account is connected */}
+            {/* DVA Section */}
             {onboardingComplete && (
               <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
                 <div style={{ padding: "14px 24px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>Virtual Account (for direct bank transfers)</div>
@@ -314,27 +310,23 @@ export default function Settings() {
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
                       <div>
-                        <label style={labelStyle}>First Name</label>
-                        <input value={dvaFirstName} onChange={e => setDvaFirstName(e.target.value)} style={inputStyle} placeholder="Your first name" />
-                      </div>
-                      <div>
-                        <label style={labelStyle}>Last Name</label>
-                        <input value={dvaLastName} onChange={e => setDvaLastName(e.target.value)} style={inputStyle} placeholder="Your last name" />
-                      </div>
-                      <div>
-                        <label style={labelStyle}>Email</label>
+                        <label style={labelStyle}>Business Email</label>
                         <input value={dvaEmail} onChange={e => setDvaEmail(e.target.value)} style={inputStyle} placeholder="your@email.com" />
                       </div>
                       <div>
                         <label style={labelStyle}>Preferred Bank</label>
                         <select value={dvaPreferredBank} onChange={e => setDvaPreferredBank(e.target.value)} style={inputStyle}>
+                          <option value="titan-paystack">Paystack-Titan</option>
                           <option value="wema-bank">Wema Bank (ALAT)</option>
-                          <option value="titan-paystack">Titan Trust Bank</option>
                         </select>
                       </div>
                     </div>
-                    {dvaError && <div style={{ background: "#fff0f0", border: "1px solid #ffcccc", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#cc2222", marginBottom: 16 }}>{dvaError}</div>}
-                    <button type="button" onClick={handleCreateDVA} disabled={creatingDva || !dvaFirstName || !dvaLastName || !dvaEmail} style={{ padding: "11px 24px", background: "#2255cc", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: creatingDva || !dvaFirstName || !dvaLastName || !dvaEmail ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", opacity: creatingDva || !dvaFirstName || !dvaLastName || !dvaEmail ? 0.7 : 1 }}>
+                    {dvaError && (
+                      <div style={{ background: "#fff0f0", border: "1px solid #ffcccc", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#cc2222", marginBottom: 16 }}>
+                        {dvaError}
+                      </div>
+                    )}
+                    <button type="button" onClick={handleCreateDVA} disabled={creatingDva || !dvaEmail} style={{ padding: "11px 24px", background: "#2255cc", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: creatingDva || !dvaEmail ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", opacity: creatingDva || !dvaEmail ? 0.7 : 1 }}>
                       {creatingDva ? "Creating..." : "Generate Virtual Account"}
                     </button>
                   </div>

@@ -13,61 +13,70 @@ export async function POST(req: NextRequest) {
   }
 
   const event = JSON.parse(rawBody);
+  console.log("Webhook event:", event.event, "channel:", event.data?.channel);
 
-  // ─── Standard card/USSD/Paystack transfer payment ───────
   if (event.event === "charge.success") {
     const { reference, amount, channel, paid_at, metadata } = event.data;
+
+    // Standard Paystack checkout payment (has invoice_id in metadata)
     const invoiceId: string = metadata?.invoice_id;
+    if (invoiceId) {
+      await handleInvoicePaid({ invoiceId, reference, amount, channel, paid_at });
+      return NextResponse.json({ ok: true });
+    }
 
-    if (!invoiceId) return NextResponse.json({ ok: true });
+    // DVA payment � match by receiver account number + exact amount
+    if (channel === "dedicated_nuban" || channel === "bank_transfer") {
+      // Receiver account is in authorization.receiver_bank_account_number
+      const receiverAccount = event.data?.authorization?.receiver_bank_account_number
+        ?? event.data?.metadata?.receiver_account_number
+        ?? null;
 
-    await handleInvoicePaid({
-      invoiceId,
-      reference,
-      amount,
-      channel,
-      paid_at,
-    });
-  }
+      const amountNaira = koboToNaira(amount);
+      console.log("DVA payment � receiver:", receiverAccount, "amount (naira):", amountNaira);
 
-  // ─── Dedicated Virtual Account transfer ─────────────────
-  if (event.event === "dedicatedaccount.assign.success" ||
-      event.event === "transfer.success") {
-    const data = event.data;
+      if (!receiverAccount) {
+        console.log("Could not determine receiver account");
+        return NextResponse.json({ ok: true });
+      }
 
-    // Find business by DVA account number
-    const accountNumber = data.dedicated_account?.account_number
-      ?? data.recipient?.details?.account_number;
+      // Find business by DVA account number
+      const { data: business } = await supabaseAdmin
+        .from("businesses")
+        .select("user_id")
+        .eq("dva_account_number", receiverAccount)
+        .single();
 
-    if (!accountNumber) return NextResponse.json({ ok: true });
+      if (!business) {
+        console.log("No business found with DVA account:", receiverAccount);
+        return NextResponse.json({ ok: true });
+      }
 
-    const { data: business } = await supabaseAdmin
-      .from("businesses")
-      .select("user_id")
-      .eq("dva_account_number", accountNumber)
-      .single();
+      // Find all unpaid sent invoices for this business
+      const { data: invoices } = await supabaseAdmin
+        .from("invoices")
+        .select("*")
+        .eq("user_id", business.user_id)
+        .eq("status", "sent")
+        .order("created_at", { ascending: false });
 
-    if (!business) return NextResponse.json({ ok: true });
+      if (!invoices || invoices.length === 0) {
+        console.log("No unpaid invoices for business");
+        return NextResponse.json({ ok: true });
+      }
 
-    // Find the most recent unpaid invoice for this business
-    const { data: invoice } = await supabaseAdmin
-      .from("invoices")
-      .select("*")
-      .eq("user_id", business.user_id)
-      .eq("status", "sent")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
+      console.log("Unpaid invoices:", invoices.map(i => ({ id: i.id, total: i.total })));
 
-    if (!invoice) return NextResponse.json({ ok: true });
+      // Match by exact amount (within 1 naira tolerance)
+      const matched = invoices.find(inv => Math.abs(Number(inv.total) - amountNaira) < 1);
 
-    await handleInvoicePaid({
-      invoiceId: invoice.id,
-      reference: data.reference ?? data.transfer_code,
-      amount: data.amount,
-      channel: "bank_transfer",
-      paid_at: data.paid_at ?? new Date().toISOString(),
-    });
+      if (!matched) {
+        console.log("No invoice matched amount:", amountNaira);
+        return NextResponse.json({ ok: true });
+      }
+
+      await handleInvoicePaid({ invoiceId: matched.id, reference, amount, channel, paid_at });
+    }
   }
 
   return NextResponse.json({ ok: true });
@@ -127,6 +136,8 @@ async function handleInvoicePaid({
       .update({ emailed_at: new Date().toISOString() })
       .eq("id", receipt.id);
   }
+
+  console.log("Invoice marked paid:", invoiceId);
 }
 
 export const config = { api: { bodyParser: false } };

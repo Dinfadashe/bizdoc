@@ -133,35 +133,37 @@ export async function getBanks() {
 }
 
 export async function createDedicatedVirtualAccount({
-  firstName,
-  lastName,
   email,
   phone,
-  preferredBank = "wema-bank",
+  preferredBank = "titan-paystack",
 }: {
-  firstName: string;
-  lastName: string;
   email: string;
   phone?: string;
   preferredBank?: string;
 }) {
-  // Step 1 — Create a Paystack customer
+  const phoneNumber = phone
+    ? phone.replace(/^\+/, "")
+    : "08000000000";
+
+  // Step 1 — Create customer
   const customerRes = await fetch(`${BASE}/customer`, {
     method: "POST",
     headers: headers(),
-    body: JSON.stringify({
-      email,
-      first_name: firstName,
-      last_name: lastName,
-      phone: phone ?? "",
-    }),
+    body: JSON.stringify({ email, phone: phoneNumber }),
   });
   const customerData = await customerRes.json();
   if (!customerData.status) throw new Error(customerData.message ?? "Failed to create customer");
 
   const customerCode = customerData.data.customer_code;
 
-  // Step 2 — Assign a dedicated virtual account
+  // Step 2 — Update customer with phone to ensure it is set
+  await fetch(`${BASE}/customer/${customerCode}`, {
+    method: "PUT",
+    headers: headers(),
+    body: JSON.stringify({ phone: phoneNumber }),
+  });
+
+  // Step 3 — Assign dedicated virtual account
   const dvaRes = await fetch(`${BASE}/dedicated_account`, {
     method: "POST",
     headers: headers(),
@@ -172,6 +174,10 @@ export async function createDedicatedVirtualAccount({
   });
 
   const dvaData = await dvaRes.json();
+
+  // Log full response for debugging
+  console.log("DVA response:", JSON.stringify(dvaData));
+
   if (!dvaData.status) throw new Error(dvaData.message ?? "Failed to create virtual account");
 
   return {
