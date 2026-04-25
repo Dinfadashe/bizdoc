@@ -23,6 +23,9 @@ export default function NewInvoice() {
   const [paymentInfo, setPaymentInfo] = useState("");
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split("T")[0]);
   const [dueDate, setDueDate] = useState("");
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateInvoice, setDuplicateInvoice] = useState<{ invoice_number: string; status: string } | null>(null);
+  const [pendingSendNow, setPendingSendNow] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -37,7 +40,7 @@ export default function NewInvoice() {
   const updateItem = (id: number, field: keyof LineItem, val: string | number) =>
     setItems(items.map(i => i.id === id ? { ...i, [field]: val } : i));
 
-  const handleSave = async (sendNow = false) => {
+  const doSave = async (sendNow: boolean) => {
     if (!userId || !client.name.trim()) return;
     setSaving(true);
     const res = await fetch("/api/invoices", {
@@ -63,13 +66,78 @@ export default function NewInvoice() {
     }
   };
 
+  const handleSave = async (sendNow: boolean) => {
+    if (!userId || !client.name.trim()) return;
+
+    // Check for duplicate invoice
+    const { data: existing } = await supabase
+      .from("invoices")
+      .select("id, invoice_number, status")
+      .eq("user_id", userId)
+      .eq("client_name", client.name.trim())
+      .eq("total", total)
+      .neq("status", "cancelled")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      setDuplicateInvoice(existing[0]);
+      setPendingSendNow(sendNow);
+      setShowDuplicateModal(true);
+      return;
+    }
+
+    await doSave(sendNow);
+  };
+
+  const handleConfirmDuplicate = async () => {
+    setShowDuplicateModal(false);
+    setDuplicateInvoice(null);
+    await doSave(pendingSendNow);
+  };
+
+  const handleCancelDuplicate = () => {
+    setShowDuplicateModal(false);
+    setDuplicateInvoice(null);
+  };
+
   const inputStyle = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--border)", borderRadius: 7, fontSize: 14, outline: "none", fontFamily: "var(--font-body)" };
   const labelStyle = { display: "block" as const, fontSize: 11, fontWeight: 700 as const, textTransform: "uppercase" as const, letterSpacing: "0.8px", color: "var(--muted)", marginBottom: 5 };
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--cream)" }}>
+
+      {/* Duplicate Invoice Modal */}
+      {showDuplicateModal && duplicateInvoice && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ background: "white", borderRadius: 14, padding: 32, maxWidth: 440, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ fontSize: 36, textAlign: "center", marginBottom: 16 }}>??</div>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, marginBottom: 8, textAlign: "center" }}>Possible Duplicate Invoice</div>
+            <div style={{ fontSize: 14, color: "var(--muted)", textAlign: "center", marginBottom: 20, lineHeight: 1.6 }}>
+              A similar invoice already exists for this client with the same amount.
+            </div>
+            <div style={{ background: "#fff8e8", border: "1px solid #f0d080", borderRadius: 10, padding: "14px 18px", marginBottom: 24 }}>
+              <div style={{ fontSize: 13, color: "#7a5500", lineHeight: 1.9 }}>
+                <span style={{ color: "#555" }}>Invoice: </span><strong>{duplicateInvoice.invoice_number}</strong><br />
+                <span style={{ color: "#555" }}>Client: </span><strong>{client.name}</strong><br />
+                <span style={{ color: "#555" }}>Amount: </span><strong>{formatCurrency(total, currency)}</strong><br />
+                <span style={{ color: "#555" }}>Status: </span><strong style={{ textTransform: "uppercase" }}>{duplicateInvoice.status}</strong>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 12 }}>
+              <button onClick={handleCancelDuplicate} style={{ flex: 1, padding: "11px", background: "#f5f2ed", color: "var(--text)", border: "1.5px solid var(--border)", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)" }}>
+                Cancel
+              </button>
+              <button onClick={handleConfirmDuplicate} style={{ flex: 1, padding: "11px", background: "var(--green)", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)" }}>
+                Create Anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <nav style={{ background: "var(--green)", padding: "0 28px", height: 60, display: "flex", alignItems: "center", gap: 16 }}>
-        <button onClick={() => router.push("/dashboard")} style={{ background: "none", border: "none", color: "white", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>←</button>
+        <button onClick={() => router.push("/dashboard")} style={{ background: "none", border: "none", color: "white", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>?</button>
         <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, color: "white" }}>New Invoice</div>
       </nav>
 
@@ -129,7 +197,7 @@ export default function NewInvoice() {
                     <td style={{ padding: "7px 6px" }}><input type="number" min={0} value={item.qty} onChange={e => updateItem(item.id, "qty", e.target.value)} style={{ ...inputStyle, width: 70 }} /></td>
                     <td style={{ padding: "7px 6px" }}><input type="number" min={0} value={item.unit_price} onChange={e => updateItem(item.id, "unit_price", e.target.value)} style={{ ...inputStyle, width: 130 }} placeholder="0.00" /></td>
                     <td style={{ padding: "7px 6px", textAlign: "right", fontWeight: 600, fontSize: 14 }}>{formatCurrency(item.qty * (Number(item.unit_price) || 0), currency)}</td>
-                    <td style={{ padding: "7px 6px" }}><button onClick={() => items.length > 1 && setItems(items.filter(i => i.id !== item.id))} style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 20, lineHeight: 1 }}>×</button></td>
+                    <td style={{ padding: "7px 6px" }}><button onClick={() => items.length > 1 && setItems(items.filter(i => i.id !== item.id))} style={{ background: "none", border: "none", cursor: "pointer", color: "#ccc", fontSize: 20, lineHeight: 1 }}>x</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -176,13 +244,13 @@ export default function NewInvoice() {
             Save as Draft
           </button>
           <button onClick={() => handleSave(true)} disabled={saving || !client.name.trim()} style={{ padding: "12px 28px", background: "var(--green)", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: saving || !client.name.trim() ? "not-allowed" : "pointer", opacity: saving || !client.name.trim() ? 0.7 : 1, fontFamily: "var(--font-body)" }}>
-            {saving ? "Saving..." : "Save & Send Invoice →"}
+            {saving ? "Saving..." : "Save & Send Invoice"}
           </button>
           {!client.name.trim() && (
             <div style={{ fontSize: 12, color: "var(--muted)", alignSelf: "center" }}>Client name is required</div>
           )}
           {client.name.trim() && !client.email && (
-            <div style={{ fontSize: 12, color: "#b36000", alignSelf: "center" }}>No email — invoice will be saved but payment link won't be sent</div>
+            <div style={{ fontSize: 12, color: "#b36000", alignSelf: "center" }}>No email � invoice will be saved but payment link will not be sent</div>
           )}
         </div>
       </div>
