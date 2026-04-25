@@ -1,52 +1,57 @@
-// Paystack API helpers (server-side only)
-
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
 const BASE = "https://api.paystack.co";
 
-interface PaystackHeaders {
-  Authorization: string;
-  "Content-Type": string;
-}
-
-function headers(): PaystackHeaders {
+function headers() {
   return {
     Authorization: `Bearer ${PAYSTACK_SECRET}`,
     "Content-Type": "application/json",
   };
 }
 
-// Initialize a transaction and return the payment URL
 export async function initializePayment({
   email,
   amountKobo,
   reference,
   metadata,
   callbackUrl,
+  subaccountCode,
+  platformFeePercent = 2,
 }: {
   email: string;
   amountKobo: number;
   reference: string;
   metadata: Record<string, unknown>;
   callbackUrl: string;
+  subaccountCode?: string;
+  platformFeePercent?: number;
 }) {
+  const platformFeeKobo = subaccountCode
+    ? Math.round((amountKobo * platformFeePercent) / 100)
+    : undefined;
+
+  const body: Record<string, unknown> = {
+    email,
+    amount: amountKobo,
+    reference,
+    metadata,
+    callback_url: callbackUrl,
+    channels: ["card", "bank", "ussd", "bank_transfer"],
+  };
+
+  if (subaccountCode) {
+    body.subaccount = subaccountCode;
+    body.bearer = "subaccount";
+    body.transaction_charge = platformFeeKobo;
+  }
+
   const res = await fetch(`${BASE}/transaction/initialize`, {
     method: "POST",
     headers: headers(),
-    body: JSON.stringify({
-      email,
-      amount: amountKobo,
-      reference,
-      metadata,
-      callback_url: callbackUrl,
-      channels: ["card", "bank", "ussd", "bank_transfer"],
-    }),
+    body: JSON.stringify(body),
   });
 
   const data = await res.json();
-
-  if (!data.status) {
-    throw new Error(data.message ?? "Paystack initialization failed");
-  }
+  if (!data.status) throw new Error(data.message ?? "Paystack initialization failed");
 
   return {
     authorization_url: data.data.authorization_url as string,
@@ -55,22 +60,16 @@ export async function initializePayment({
   };
 }
 
-// Verify a transaction by reference
 export async function verifyPayment(reference: string) {
   const res = await fetch(`${BASE}/transaction/verify/${reference}`, {
     headers: headers(),
   });
-
   const data = await res.json();
-
-  if (!data.status) {
-    throw new Error(data.message ?? "Paystack verification failed");
-  }
-
+  if (!data.status) throw new Error(data.message ?? "Paystack verification failed");
   return data.data as {
-    status: string; // "success" | "failed" | "abandoned"
+    status: string;
     reference: string;
-    amount: number; // in kobo
+    amount: number;
     paid_at: string;
     channel: string;
     currency: string;
@@ -79,11 +78,61 @@ export async function verifyPayment(reference: string) {
   };
 }
 
-// Verify a webhook signature
-export function verifyWebhookSignature(
-  body: string,
-  signature: string
-): boolean {
+export async function createSubaccount({
+  businessName,
+  bankCode,
+  accountNumber,
+  percentageCharge = 98,
+}: {
+  businessName: string;
+  bankCode: string;
+  accountNumber: string;
+  percentageCharge?: number;
+}) {
+  const res = await fetch(`${BASE}/subaccount`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({
+      business_name: businessName,
+      settlement_bank: bankCode,
+      account_number: accountNumber,
+      percentage_charge: 100 - percentageCharge,
+    }),
+  });
+
+  const data = await res.json();
+  if (!data.status) throw new Error(data.message ?? "Failed to create subaccount");
+
+  return {
+    subaccount_code: data.data.subaccount_code as string,
+    subaccount_id: String(data.data.id),
+    account_name: data.data.account_name as string,
+  };
+}
+
+export async function resolveBankAccount(accountNumber: string, bankCode: string) {
+  const res = await fetch(
+    `${BASE}/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`,
+    { headers: headers() }
+  );
+  const data = await res.json();
+  if (!data.status) throw new Error(data.message ?? "Could not resolve account");
+  return {
+    account_name: data.data.account_name as string,
+    account_number: data.data.account_number as string,
+  };
+}
+
+export async function getBanks() {
+  const res = await fetch(`${BASE}/bank?country=nigeria&perPage=100`, {
+    headers: headers(),
+  });
+  const data = await res.json();
+  if (!data.status) throw new Error("Could not fetch banks");
+  return data.data as { name: string; code: string; slug: string }[];
+}
+
+export function verifyWebhookSignature(body: string, signature: string): boolean {
   const crypto = require("crypto");
   const hash = crypto
     .createHmac("sha512", PAYSTACK_SECRET)

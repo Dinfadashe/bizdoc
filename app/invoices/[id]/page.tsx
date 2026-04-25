@@ -1,10 +1,11 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useParams } from "next/navigation";
 import { Invoice, Receipt } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import Link from "next/link";
+import QRCode from "qrcode";
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   draft:     { bg: "#f0f0f0", text: "#888" },
@@ -23,7 +24,8 @@ export default function InvoiceDetail() {
   const [loading, setLoading] = useState(true);
   const [sendingLink, setSendingLink] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [printMode, setPrintMode] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string>("");
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const load = useCallback(async () => {
     const { data: inv } = await supabase.from("invoices").select("*").eq("id", id).single();
@@ -40,6 +42,17 @@ export default function InvoiceDetail() {
   }, [id, router]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Generate QR code whenever payment_url is available
+  useEffect(() => {
+    if (!invoice?.payment_url) return;
+    const payUrl = `${window.location.origin}/invoices/${id}/pay`;
+    QRCode.toDataURL(payUrl, {
+      width: 160,
+      margin: 1,
+      color: { dark: "#1a4a2e", light: "#ffffff" },
+    }).then(setQrDataUrl).catch(console.error);
+  }, [invoice?.payment_url, id]);
 
   const generatePaymentLink = async () => {
     if (!invoice) return;
@@ -61,46 +74,49 @@ export default function InvoiceDetail() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handlePrint = () => {
-    setPrintMode(true);
-    setTimeout(() => { window.print(); setPrintMode(false); }, 200);
-  };
+  const handlePrint = () => window.print();
 
   if (loading) return <div style={{ padding: 60, textAlign: "center", color: "var(--muted)" }}>Loading...</div>;
   if (!invoice) return null;
 
   const sc = STATUS_COLORS[invoice.status] ?? STATUS_COLORS.draft;
+  const payPageUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/invoices/${id}/pay`;
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--cream)" }}>
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          body { background: white !important; }
+        }
+      `}</style>
+
       {/* Nav */}
-      {!printMode && (
-        <nav className="no-print" style={{ background: "var(--green)", padding: "0 28px", height: 60, display: "flex", alignItems: "center", gap: 16 }}>
-          <Link href="/dashboard">
-            <button style={{ background: "none", border: "none", color: "white", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>←</button>
-          </Link>
-          <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, color: "white", flex: 1 }}>
-            {invoice.invoice_number}
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={handlePrint} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "7px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>
-              🖨 Print
-            </button>
-            {invoice.status === "paid" && receipt && (
-              <Link href={`/invoices/${id}/receipt`}>
-                <button style={{ background: "#4caf7d", border: "none", color: "white", padding: "7px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>
-                  View Receipt
-                </button>
-              </Link>
-            )}
-          </div>
-        </nav>
-      )}
+      <nav className="no-print" style={{ background: "var(--green)", padding: "0 28px", height: 60, display: "flex", alignItems: "center", gap: 16 }}>
+        <Link href="/dashboard">
+          <button style={{ background: "none", border: "none", color: "white", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>←</button>
+        </Link>
+        <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, color: "white", flex: 1 }}>
+          {invoice.invoice_number}
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={handlePrint} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "7px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>
+            🖨 Print
+          </button>
+          {invoice.status === "paid" && receipt && (
+            <Link href={`/invoices/${id}/receipt`}>
+              <button style={{ background: "#4caf7d", border: "none", color: "white", padding: "7px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>
+                View Receipt
+              </button>
+            </Link>
+          )}
+        </div>
+      </nav>
 
       <div style={{ maxWidth: 820, margin: "0 auto", padding: "28px 20px" }}>
 
         {/* Action banner */}
-        {!printMode && invoice.status !== "paid" && invoice.status !== "cancelled" && (
+        {invoice.status !== "paid" && invoice.status !== "cancelled" && (
           <div className="no-print" style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", padding: "20px 24px", marginBottom: 20, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 3 }}>
@@ -109,9 +125,7 @@ export default function InvoiceDetail() {
               <div style={{ color: "var(--muted)", fontSize: 13 }}>
                 {invoice.status === "draft"
                   ? "Generate a Paystack payment link and email it to your client."
-                  : invoice.payment_url
-                    ? `Client can pay via: ${invoice.payment_url.slice(0, 50)}...`
-                    : "No payment link yet."}
+                  : `Payment URL: ${invoice.payment_url?.slice(0, 48)}...`}
               </div>
             </div>
             <div style={{ display: "flex", gap: 10 }}>
@@ -141,7 +155,7 @@ export default function InvoiceDetail() {
         )}
 
         {/* Invoice document */}
-        <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }} id="invoice-doc">
+        <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
 
           {/* Header */}
           <div style={{ background: "var(--green)", padding: "28px 32px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
@@ -224,9 +238,27 @@ export default function InvoiceDetail() {
             </table>
           </div>
 
-          {/* Totals */}
-          <div style={{ padding: "20px 32px", display: "flex", justifyContent: "flex-end", borderTop: "1px solid var(--border)" }}>
-            <div style={{ width: 260 }}>
+          {/* Totals + QR Code side by side */}
+          <div style={{ padding: "20px 32px", display: "flex", justifyContent: "space-between", alignItems: "flex-end", borderTop: "1px solid var(--border)", flexWrap: "wrap", gap: 20 }}>
+
+            {/* QR Code — only show if payment link exists and invoice not paid */}
+            {qrDataUrl && invoice.status !== "paid" ? (
+              <div style={{ textAlign: "center" }}>
+                <img src={qrDataUrl} alt="Payment QR Code" style={{ width: 120, height: 120, borderRadius: 8, border: "2px solid var(--green-light)" }} />
+                <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 6, textTransform: "uppercase", letterSpacing: "0.8px", fontWeight: 700 }}>Scan to Pay</div>
+                <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>{payPageUrl}</div>
+              </div>
+            ) : invoice.status === "paid" ? (
+              <div style={{ textAlign: "center", opacity: 0.4 }}>
+                <div style={{ fontSize: 40 }}>✅</div>
+                <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>Paid</div>
+              </div>
+            ) : (
+              <div style={{ width: 120 }} />
+            )}
+
+            {/* Totals */}
+            <div style={{ minWidth: 260 }}>
               {[
                 ["Subtotal", formatCurrency(invoice.subtotal, invoice.currency)],
                 invoice.discount_amount > 0 ? ["Discount", `−${formatCurrency(invoice.discount_amount, invoice.currency)}`] : null,
@@ -250,9 +282,9 @@ export default function InvoiceDetail() {
             </div>
           )}
 
-          {/* Pay button for client (shown if payment_url exists & not paid) */}
+          {/* Pay button */}
           {invoice.payment_url && invoice.status !== "paid" && (
-            <div style={{ padding: "24px 32px", borderTop: "1px solid var(--border)", textAlign: "center", background: "var(--green-light)" }}>
+            <div className="no-print" style={{ padding: "24px 32px", borderTop: "1px solid var(--border)", textAlign: "center", background: "var(--green-light)" }}>
               <a href={invoice.payment_url} target="_blank" rel="noreferrer">
                 <button style={{ background: "var(--green)", color: "white", border: "none", padding: "14px 40px", borderRadius: 8, fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)" }}>
                   Pay Now — {formatCurrency(invoice.total, invoice.currency)}
