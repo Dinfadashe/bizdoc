@@ -217,7 +217,7 @@ export default function NewInvoice() {
                 ["Subtotal", formatCurrency(subtotal, currency)],
                 discountAmount > 0 ? ["Discount", "-" + formatCurrency(discountAmount, currency)] : null,
                 taxAmount > 0 ? ["Tax (" + taxRate + "%)", formatCurrency(taxAmount, currency)] : null,
-              ].filter(Boolean).map(([label, val]) => (
+              ].filter((x): x is string[] => x !== null).map(([label, val]) => (
                 <div key={label as string} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--muted)", padding: "4px 0" }}>
                   <span>{label}</span><span>{val as string}</span>
                 </div>
