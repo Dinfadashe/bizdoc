@@ -250,7 +250,7 @@ export default function NewInvoice() {
             <div style={{ fontSize: 12, color: "var(--muted)", alignSelf: "center" }}>Client name is required</div>
           )}
           {client.name.trim() && !client.email && (
-            <div style={{ fontSize: 12, color: "#b36000", alignSelf: "center" }}>No email — invoice will be saved but payment link will not be sent</div>
+            <div style={{ fontSize: 12, color: "#b36000", alignSelf: "center" }}>No email ï¿½ invoice will be saved but payment link will not be sent</div>
           )}
         </div>
       </div>

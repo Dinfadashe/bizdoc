@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // DVA payment — match by receiver account number + exact amount
+    // DVA payment ï¿½ match by receiver account number + exact amount
     if (channel === "dedicated_nuban" || channel === "bank_transfer") {
       // Receiver account is in authorization.receiver_bank_account_number
       const receiverAccount = event.data?.authorization?.receiver_bank_account_number
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
         ?? null;
 
       const amountNaira = koboToNaira(amount);
-      console.log("DVA payment — receiver:", receiverAccount, "amount (naira):", amountNaira);
+      console.log("DVA payment ï¿½ receiver:", receiverAccount, "amount (naira):", amountNaira);
 
       if (!receiverAccount) {
         console.log("Could not determine receiver account");
