@@ -191,7 +191,7 @@ export default function InvoiceDetail() {
               invoice.due_date ? ["Due Date", new Date(invoice.due_date).toDateString()] : null,
               ["Currency", invoice.currency],
               invoice.paid_at ? ["Paid On", new Date(invoice.paid_at).toDateString()] : null,
-            ].filter(Boolean).map(([label, val]) => (
+            ].filter((x): x is string[] => x !== null).map(([label, val]) => (
               <div key={label as string}>
                 <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "1px", color: "var(--muted)", marginBottom: 3 }}>{label}</div>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{val as string}</div>
@@ -263,7 +263,7 @@ export default function InvoiceDetail() {
                 ["Subtotal", formatCurrency(invoice.subtotal, invoice.currency)],
                 invoice.discount_amount > 0 ? ["Discount", "-" + formatCurrency(invoice.discount_amount, invoice.currency)] : null,
                 invoice.tax_amount > 0 ? ["Tax (" + invoice.tax_rate + "%)", formatCurrency(invoice.tax_amount, invoice.currency)] : null,
-              ].filter(Boolean).map(([label, val]) => (
+              ].filter((x): x is string[] => x !== null).map(([label, val]) => (
                 <div key={label as string} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "var(--muted)", padding: "4px 0" }}>
                   <span>{label}</span><span>{val as string}</span>
                 </div>
@@ -330,3 +330,4 @@ export default function InvoiceDetail() {
     </div>
   );
 }
+
