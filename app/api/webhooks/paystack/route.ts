@@ -65,10 +65,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true });
       }
 
-      console.log("Unpaid invoices:", invoices.map(i => ({ id: i.id, total: i.total })));
+      console.log("Unpaid invoices:", invoices.map((i: any) => ({ id: i.id, total: i.total })));
 
       // Match by exact amount (within 1 naira tolerance)
-      const matched = invoices.find(inv => Math.abs(Number(inv.total) - amountNaira) < 1);
+      const matched = invoices.find((inv: any) => Math.abs(Number(inv.total) - amountNaira) < 1);
 
       if (!matched) {
         console.log("No invoice matched amount:", amountNaira);
@@ -141,3 +141,4 @@ async function handleInvoicePaid({
 }
 
 export const config = { api: { bodyParser: false } };
+
