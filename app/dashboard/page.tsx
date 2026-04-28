@@ -23,6 +23,9 @@ export default function Dashboard() {
   const [business, setBusiness] = useState<{ name: string; logo_url: string; onboarding_complete: boolean } | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isStaff, setIsStaff] = useState(false);
+  const [staffBusinessOwnerId, setStaffBusinessOwnerId] = useState<string | null>(null);
+  const [isStaff, setIsStaff] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportType, setReportType] = useState<"monthly" | "annual">("monthly");
   const [reportMonth, setReportMonth] = useState(new Date().getMonth());
@@ -42,10 +45,23 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) { router.push("/"); return; }
       setUser(data.user);
-      load(data.user.id);
+      // Check if this user is a staff member
+      const { data: memberData } = await supabase
+        .from("team_members")
+        .select("owner_user_id, status")
+        .eq("member_user_id", data.user.id)
+        .eq("status", "active")
+        .single();
+      if (memberData) {
+        setIsStaff(true);
+        setStaffBusinessOwnerId(memberData.owner_user_id);
+        load(memberData.owner_user_id);
+      } else {
+        load(data.user.id);
+      }
     });
   }, [router, load]);
 
@@ -312,7 +328,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 28 }}>
+        {!isStaff && <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 28 }}>
           {[
             { label: "Total Invoices", value: String(invoices.length), mono: false },
             { label: "Revenue Collected", value: formatCurrency(totalPaid), mono: true },
@@ -323,10 +339,10 @@ export default function Dashboard() {
               <div style={{ fontFamily: s.mono ? "var(--font-body)" : "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--green)" }}>{s.value}</div>
             </div>
           ))}
-        </div>
+        </div>}
 
         {/* Reports Section */}
-        <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 24, overflow: "hidden" }}>
+        {!isStaff && <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 24, overflow: "hidden" }}>
           <div
             onClick={() => setShowReportPanel(!showReportPanel)}
             style={{ padding: "14px 22px", background: "#faf9f7", borderBottom: showReportPanel ? "1px solid var(--border)" : "none", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
@@ -375,7 +391,7 @@ export default function Dashboard() {
               </button>
             </div>
           )}
-        </div>
+        </div>}
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h1 style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700 }}>Invoices</h1>
@@ -423,3 +439,5 @@ export default function Dashboard() {
     </div>
   );
 }
+
+
