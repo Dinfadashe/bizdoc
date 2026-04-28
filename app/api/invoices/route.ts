@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
       discount_value = 0,
       tax_rate = 7.5,
       notes, payment_info,
-      issue_date, due_date: due_date || null,
+      issue_date, due_date,
       currency = "NGN",
     } = body;
 
@@ -23,6 +23,9 @@ export async function POST(req: NextRequest) {
     const { subtotal, discountAmount, taxAmount, total } = calcTotals(
       items, discount_type, discount_value, tax_rate
     );
+
+    const today = new Date().toISOString().split("T")[0];
+    const tomorrow = new Date(new Date().getTime() + 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
     const { data, error } = await supabaseAdmin
       .from("invoices")
@@ -41,8 +44,8 @@ export async function POST(req: NextRequest) {
         subtotal,
         total,
         notes, payment_info,
-        issue_date: issue_date ?? new Date().toISOString().split("T")[0],
-        due_date: due_date || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+        issue_date: issue_date || today,
+        due_date: due_date || tomorrow,
       })
       .select()
       .single();
@@ -56,10 +59,16 @@ export async function POST(req: NextRequest) {
         .select("name")
         .eq("user_id", user_id);
 
-      const existingNames = new Set((existingCatalog ?? []).map((c: any) => c.name.toLowerCase().trim()));
+      const existingNames = new Set(
+        (existingCatalog ?? []).map((c: any) => c.name.toLowerCase().trim())
+      );
 
       const newItems = items
-        .filter((item: any) => item.description && item.description.trim() && !existingNames.has(item.description.toLowerCase().trim()))
+        .filter((item: any) =>
+          item.description &&
+          item.description.trim() &&
+          !existingNames.has(item.description.toLowerCase().trim())
+        )
         .map((item: any) => ({
           user_id,
           name: item.description.trim(),
@@ -74,15 +83,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ invoice: data });
   } catch (err: unknown) {
-    console.error("Invoice creation error:", err);
-    console.error("Invoice creation error:", err);
     const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("Invoice creation error:", err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
-
-
-
-
-
-

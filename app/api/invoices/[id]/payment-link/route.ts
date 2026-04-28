@@ -1,81 +1,68 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { initializePayment } from "@/lib/paystack";
-import { nairaToKobo } from "@/lib/utils";
-import { sendInvoiceEmail } from "@/lib/email";
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
+const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
 
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { data: invoice, error: invErr } = await supabaseAdmin
+    const { id } = await params;
+
+    const { data: invoice } = await supabaseAdmin
       .from("invoices")
       .select("*")
       .eq("id", id)
       .single();
 
-    if (invErr || !invoice) {
-      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
-    }
+    if (!invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
 
     const { data: business } = await supabaseAdmin
       .from("businesses")
-      .select("*")
+      .select("subaccount_code, name")
       .eq("user_id", invoice.user_id)
       .single();
 
-    if (!invoice.client_email) {
-      return NextResponse.json({
-        error: "Client email is required to send a payment link. You can still print the invoice with bank transfer details.",
-      }, { status: 400 });
+    const amountKobo = Math.round(Number(invoice.total) * 100);
+
+    const body: any = {
+      email: invoice.client_email || "customer@bizdoc.app",
+      amount: amountKobo,
+      currency: invoice.currency || "NGN",
+      metadata: { invoice_id: id },
+      callback_url: process.env.NEXT_PUBLIC_APP_URL + "/invoices/" + id + "/pay",
+    };
+
+    if (business?.subaccount_code && invoice.currency === "NGN") {
+      body.subaccount = business.subaccount_code;
+      body.bearer = "subaccount";
+      body.transaction_charge = Math.round(amountKobo * 0.02);
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-    const callbackUrl = `${appUrl}/invoices/${id}/pay?verified=1`;
-
-    const amountKobo = invoice.currency === "NGN"
-      ? nairaToKobo(invoice.total)
-      : Math.round(invoice.total * 100);
-
-    const { authorization_url, access_code, reference } = await initializePayment({
-      email: invoice.client_email,
-      amountKobo,
-      reference: `${invoice.invoice_number}-${Date.now()}`,
-      metadata: {
-        invoice_id: invoice.id,
-        invoice_number: invoice.invoice_number,
-        client_name: invoice.client_name,
+    const res = await fetch("https://api.paystack.co/transaction/initialize", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + PAYSTACK_SECRET,
+        "Content-Type": "application/json",
       },
-      callbackUrl,
-      subaccountCode: business?.subaccount_code ?? undefined,
-      platformFeePercent: business?.platform_fee_percent ?? 2,
+      body: JSON.stringify(body),
     });
+
+    const data = await res.json();
+    if (!data.status) throw new Error(data.message ?? "Paystack error");
 
     await supabaseAdmin
       .from("invoices")
       .update({
-        paystack_reference: reference,
-        paystack_access_code: access_code,
-        payment_url: authorization_url,
-        subaccount_code: business?.subaccount_code ?? null,
         status: "sent",
+        payment_url: data.data.authorization_url,
+        paystack_access_code: data.data.access_code,
+        paystack_reference: data.data.reference,
       })
       .eq("id", id);
 
-    if (invoice.client_email) {
-      await sendInvoiceEmail(
-        { ...invoice, payment_url: authorization_url },
-        business,
-        authorization_url
-      ).catch(console.error);
-    }
-
-    return NextResponse.json({ payment_url: authorization_url, reference });
+    return NextResponse.json({ payment_url: data.data.authorization_url });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("Payment link error:", err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
