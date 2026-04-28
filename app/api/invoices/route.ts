@@ -1,4 +1,4 @@
-// POST /api/invoices — create a new invoice
+// POST /api/invoices - create a new invoice
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { calcTotals, generateInvoiceNumber } from "@/lib/utils";
@@ -48,6 +48,30 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    // Auto-add new line items to catalog if not already there
+    if (items.length > 0) {
+      const { data: existingCatalog } = await supabaseAdmin
+        .from("catalog")
+        .select("name")
+        .eq("user_id", user_id);
+
+      const existingNames = new Set((existingCatalog ?? []).map((c: any) => c.name.toLowerCase().trim()));
+
+      const newItems = items
+        .filter((item: any) => item.description && item.description.trim() && !existingNames.has(item.description.toLowerCase().trim()))
+        .map((item: any) => ({
+          user_id,
+          name: item.description.trim(),
+          description: "",
+          unit_price: item.unit_price ?? 0,
+        }));
+
+      if (newItems.length > 0) {
+        await supabaseAdmin.from("catalog").insert(newItems).catch(() => {});
+      }
+    }
+
     return NextResponse.json({ invoice: data });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";

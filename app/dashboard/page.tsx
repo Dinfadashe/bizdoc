@@ -281,6 +281,11 @@ export default function Dashboard() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <Link href="/settings?tab=catalog">
+            <button style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>
+              Catalog
+            </button>
+          </Link>
           <Link href="/settings">
             <button style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>
               Settings
