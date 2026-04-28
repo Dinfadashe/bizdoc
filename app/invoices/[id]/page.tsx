@@ -78,17 +78,19 @@ export default function InvoiceDetail() {
     window.open(`https://wa.me/?text=${msg}`, "_blank");
   };
 
-  const getUssdCode = () => {
-    if (!business?.dva_account_number) return null;
-    const bank = business?.dva_bank ?? "";
+  const getUssdCodes = () => {
+    if (!business?.dva_account_number) return [];
+    const acc = business.dva_account_number;
     const amount = invoice?.total ?? 0;
-    if (bank.toLowerCase().includes("titan") || bank.toLowerCase().includes("paystack")) {
-      return `*901*000*${business.dva_account_number}*${amount}#`;
-    }
-    if (bank.toLowerCase().includes("wema") || bank.toLowerCase().includes("alat")) {
-      return `*945*${business.dva_account_number}*${amount}#`;
-    }
-    return null;
+    const amt = Math.round(Number(amount));
+    return [
+      { bank: "GTBank", code: `*737*2*${amt}*${acc}#` },
+      { bank: "Zenith Bank", code: `*966*${amt}*${acc}#` },
+      { bank: "Access Bank", code: `*901*000*${acc}*${amt}#` },
+      { bank: "First Bank", code: `*894*${acc}*${amt}#` },
+      { bank: "UBA", code: `*919*3*${acc}*${amt}#` },
+      { bank: "OPay", code: `*955*${acc}*${amt}#` },
+    ];
   };
 
   const handlePrint = () => window.print();
@@ -103,6 +105,15 @@ export default function InvoiceDetail() {
     <div style={{ minHeight: "100vh", background: "var(--cream)" }}>
       <style>{`
         @media print {
+            #invoice-print-wrapper * { font-size: 10px !important; line-height: 1.3 !important; }
+            #invoice-print-wrapper h1, #invoice-print-wrapper .invoice-title { font-size: 28px !important; }
+            #invoice-print-wrapper th { font-size: 9px !important; padding: 5px 6px !important; }
+            #invoice-print-wrapper td { font-size: 9px !important; padding: 5px 6px !important; }
+            #invoice-print-wrapper .total-amount { font-size: 14px !important; }
+            #invoice-print-wrapper img { width: 80px !important; height: 80px !important; }
+            #invoice-print-wrapper [style*="padding: \"20px 32px\""] { padding: 10px 32px !important; }
+            #invoice-print-wrapper [style*="padding: \"12px 32px\""] { padding: 6px 32px !important; }
+            #invoice-print-wrapper [style*="padding: \"28px 32px\""] { padding: 12px 32px !important; }
           .no-print { display: none !important; }
           body { background: white !important; margin: 0 !important; padding: 0 !important; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
@@ -153,7 +164,7 @@ export default function InvoiceDetail() {
         </div>
       </nav>
 
-      <div style={{ maxWidth: 820, margin: "0 auto", padding: "28px 20px" }}>
+      <div id="invoice-print-wrapper"><div id="invoice-doc" style={{ maxWidth: 820, margin: "0 auto", padding: "28px 20px" }}>
 
         {invoice.status !== "paid" && invoice.status !== "cancelled" && (
           <div className="no-print" style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", padding: "20px 24px", marginBottom: 20, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
@@ -317,15 +328,13 @@ export default function InvoiceDetail() {
             </div>
           </div>
 
-          <div style={{ padding: "20px 32px", borderTop: "1px solid var(--border)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+          <div style={{ padding: "20px 32px", borderTop: "1px solid var(--border)", display: "grid", gridTemplateColumns: invoice.notes ? "1fr 1fr" : "1fr", gap: 24 }}>
+            {invoice.notes && (
             <div>
-              {invoice.notes && (
-                <>
                   <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "1px", color: "var(--muted)", marginBottom: 6 }}>Notes</div>
                   <div style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>{invoice.notes}</div>
-                </>
-              )}
             </div>
+            )}
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "1px", color: "var(--muted)", marginBottom: 8 }}>Payment Options</div>
               {business?.dva_account_number ? (
@@ -337,13 +346,7 @@ export default function InvoiceDetail() {
                     <span style={{ color: "var(--muted)" }}>Account Name: </span><strong>{business.dva_account_name}</strong>
                   </div>
                   <div style={{ fontSize: 11, color: "#2255cc", marginTop: 6 }}>Transfer exact amount — receipt will be sent automatically.</div>
-                  {getUssdCode() && (
-                    <div style={{ marginTop: 10, padding: "10px 12px", background: "white", border: "1px solid #b8c8ff", borderRadius: 6 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#2255cc", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.8px" }}>USSD Payment Code</div>
-                      <div style={{ fontFamily: "monospace", fontSize: 18, fontWeight: 700, color: "#1a1a1a", letterSpacing: 1 }}>{getUssdCode()}</div>
-                      <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>Dial this code on any phone to pay — no internet required.</div>
-                    </div>
-                  )}
+
                 </div>
               ) : business?.account_name ? (
                 <div style={{ background: "var(--green-light)", border: "1px solid #b8dfc9", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
@@ -365,6 +368,19 @@ export default function InvoiceDetail() {
             </div>
           </div>
 
+          {getUssdCodes().length > 0 && business?.dva_account_number && (
+            <div style={{ padding: "12px 32px", borderTop: "1px solid var(--border)", background: "#f0f4ff" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "#2255cc", marginBottom: 8 }}>USSD Payment Codes — dial any code to pay, no internet required</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
+                {getUssdCodes().map(({ bank, code }) => (
+                  <div key={bank} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px", background: "white", borderRadius: 4, border: "1px solid #b8c8ff" }}>
+                    <div style={{ fontSize: 11, color: "#555", fontWeight: 600 }}>{bank}</div>
+                    <div style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: "#1a1a1a" }}>{code}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {invoice.payment_url && invoice.status !== "paid" && (
             <div className="no-print" style={{ padding: "24px 32px", borderTop: "1px solid var(--border)", textAlign: "center", background: "var(--green-light)" }}>
               <a href={invoice.payment_url} target="_blank" rel="noreferrer">
@@ -377,8 +393,16 @@ export default function InvoiceDetail() {
           )}
         </div>
       </div>
-    </div>
+    </div></div>
   );
 }
+
+
+
+
+
+
+
+
 
 
