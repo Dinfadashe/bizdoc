@@ -1,0 +1,78 @@
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase";
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const userId = searchParams.get("user_id");
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
+
+  if (!userId || !from || !to) {
+    return NextResponse.json({ error: "user_id, from, and to are required" }, { status: 400 });
+  }
+
+  const { data: invoices, error } = await supabaseAdmin
+    .from("invoices")
+    .select("*")
+    .eq("user_id", userId)
+    .gte("issue_date", from)
+    .lte("issue_date", to)
+    .order("issue_date", { ascending: true });
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const { data: business } = await supabaseAdmin
+    .from("businesses")
+    .select("name, email, address, phone")
+    .eq("user_id", userId)
+    .single();
+
+  // Compute summary
+  const paid = invoices?.filter(i => i.status === "paid") ?? [];
+  const pending = invoices?.filter(i => i.status === "sent") ?? [];
+  const cancelled = invoices?.filter(i => i.status === "cancelled") ?? [];
+  const draft = invoices?.filter(i => i.status === "draft") ?? [];
+
+  const totalRevenue = paid.reduce((sum, i) => sum + Number(i.total), 0);
+  const totalPending = pending.reduce((sum, i) => sum + Number(i.total), 0);
+  const totalCancelled = cancelled.reduce((sum, i) => sum + Number(i.total), 0);
+
+  // Client breakdown
+  const clientMap: Record<string, number> = {};
+  invoices?.forEach(i => {
+    if (!i.client_name) return;
+    clientMap[i.client_name] = (clientMap[i.client_name] ?? 0) + 1;
+  });
+
+  // Payment method breakdown (paid invoices only)
+  const { data: receipts } = await supabaseAdmin
+    .from("receipts")
+    .select("payment_method, amount_paid")
+    .eq("user_id", userId)
+    .in("invoice_id", paid.map(i => i.id));
+
+  const methodMap: Record<string, { count: number; total: number }> = {};
+  receipts?.forEach(r => {
+    const method = r.payment_method ?? "unknown";
+    if (!methodMap[method]) methodMap[method] = { count: 0, total: 0 };
+    methodMap[method].count++;
+    methodMap[method].total += Number(r.amount_paid);
+  });
+
+  return NextResponse.json({
+    business,
+    invoices,
+    summary: {
+      totalRevenue,
+      totalPending,
+      totalCancelled,
+      paidCount: paid.length,
+      pendingCount: pending.length,
+      cancelledCount: cancelled.length,
+      draftCount: draft.length,
+      totalInvoices: invoices?.length ?? 0,
+    },
+    clientBreakdown: Object.entries(clientMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
+    paymentMethods: Object.entries(methodMap).map(([method, data]) => ({ method, ...data })),
+  });
+}
