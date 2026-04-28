@@ -133,6 +133,23 @@ export default function InvoiceDetail() {
               </button>
             </Link>
           )}
+          {invoice.status !== "paid" && invoice.status !== "cancelled" && (
+            <button onClick={async () => {
+              if (!confirm("Mark this invoice as paid (cash payment)?")) return;
+              const res = await fetch(`/api/invoices/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "paid", paid_at: new Date().toISOString(), payment_method: "cash" }),
+              });
+              const data = await res.json();
+              if (data.invoice) {
+                setInvoice({ ...invoice, status: "paid", paid_at: data.invoice.paid_at });
+                load();
+              }
+            }} style={{ background: "#f5f2ed", border: "1.5px solid var(--border)", color: "var(--text)", padding: "7px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>
+              Mark as Paid
+            </button>
+          )}
         </div>
       </nav>
 
@@ -363,4 +380,5 @@ export default function InvoiceDetail() {
     </div>
   );
 }
+
 

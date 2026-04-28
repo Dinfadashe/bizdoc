@@ -1,50 +1,61 @@
-// GET /api/invoices/[id] — fetch a single invoice
-// PATCH /api/invoices/[id] — update an invoice
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { calcTotals } from "@/lib/utils";
+import { generateReceiptNumber } from "@/lib/utils";
+import { sendReceiptEmail } from "@/lib/email";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { data, error } = await supabaseAdmin
-    .from("invoices")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 404 });
+  const { data, error } = await supabaseAdmin.from("invoices").select("*").eq("id", id).single();
+  if (error || !data) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ invoice: data });
 }
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const body = await req.json();
+  try {
+    const body = await req.json();
+    const { status, paid_at, payment_method } = body;
 
-  // If items/discount/tax changed, recalculate totals
-  if (body.items || body.discount_value !== undefined || body.tax_rate !== undefined) {
-    const existing = await supabaseAdmin.from("invoices").select("*").eq("id", id).single();
-    const inv = existing.data;
-    const items = body.items ?? inv.items;
-    const discount_type = body.discount_type ?? inv.discount_type;
-    const discount_value = body.discount_value ?? inv.discount_value;
-    const tax_rate = body.tax_rate ?? inv.tax_rate;
-    const { subtotal, discountAmount, taxAmount, total } = calcTotals(items, discount_type, discount_value, tax_rate);
-    Object.assign(body, { subtotal, discount_amount: discountAmount, tax_amount: taxAmount, total });
+    const { data: invoice, error } = await supabaseAdmin
+      .from("invoices")
+      .update({ status, paid_at })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Create receipt for cash payments
+    if (status === "paid" && payment_method === "cash") {
+      const receiptNumber = generateReceiptNumber(invoice.invoice_number);
+      const { data: receipt } = await supabaseAdmin
+        .from("receipts")
+        .insert({
+          invoice_id: id,
+          user_id: invoice.user_id,
+          receipt_number: receiptNumber,
+          amount_paid: invoice.total,
+          payment_method: "cash",
+          paystack_reference: "CASH-" + id.slice(0, 8),
+          paid_at,
+        })
+        .select()
+        .single();
+
+      const { data: business } = await supabaseAdmin
+        .from("businesses")
+        .select("*")
+        .eq("user_id", invoice.user_id)
+        .single();
+
+      if (invoice.client_email && receipt && business) {
+        await sendReceiptEmail(invoice, receipt, business).catch(console.error);
+      }
+    }
+
+    return NextResponse.json({ invoice });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const { data, error } = await supabaseAdmin
-    .from("invoices")
-    .update(body)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ invoice: data });
 }
