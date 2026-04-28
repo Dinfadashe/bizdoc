@@ -25,7 +25,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [isStaff, setIsStaff] = useState(false);
   const [staffBusinessOwnerId, setStaffBusinessOwnerId] = useState<string | null>(null);
-  const [isStaff, setIsStaff] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportType, setReportType] = useState<"monthly" | "annual">("monthly");
   const [reportMonth, setReportMonth] = useState(new Date().getMonth());
@@ -439,5 +438,6 @@ export default function Dashboard() {
     </div>
   );
 }
+
 
 
