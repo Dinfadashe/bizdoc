@@ -13,22 +13,23 @@ export async function POST(req: NextRequest) {
     // Fetch business payout account name
     const { data: business } = await supabaseAdmin
       .from("businesses")
-      .select("account_name, name")
+      .select("account_name, name, phone")
       .eq("user_id", user_id)
       .single();
 
-    // Use payout account_name if available, else business name
-    const accountName = business?.account_name || business?.name || "Business Owner";
-    const nameParts = accountName.trim().split(" ");
-    const firstName = nameParts[0] ?? "Business";
-    const lastName = nameParts.slice(1).join(" ") || "Owner";
+    // Use payout account_name as DVA name - split into first/last for Paystack
+    const displayName = business?.account_name || business?.name || "Business Owner";
+    const nameParts = displayName.trim().split(" ");
+    const firstName = nameParts.slice(0, -1).join(" ") || nameParts[0];
+    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : "Account";
+    const businessPhone = phone || business?.phone || "08000000000";
 
     const { bank, account_number, account_name, dva_reference } = await createDedicatedVirtualAccount({
       email,
-      phone,
+      phone: businessPhone,
       firstName,
       lastName,
-      businessName: accountName,
+      businessName: displayName,
       preferredBank: preferred_bank ?? "titan-paystack",
     });
 
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
       .update({
         dva_bank: bank,
         dva_account_number: account_number,
-        dva_account_name: account_name,
+        dva_account_name: account_name || displayName,
         dva_reference,
       })
       .eq("user_id", user_id)
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
 
-    return NextResponse.json({ business: data, account_number, bank, account_name });
+    return NextResponse.json({ business: data, account_number, bank, account_name: account_name || displayName });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
