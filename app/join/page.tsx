@@ -1,10 +1,9 @@
 "use client";
-export const dynamic = "force-dynamic";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function JoinPage() {
+function JoinContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
@@ -100,5 +99,13 @@ export default function JoinPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function JoinPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 60, textAlign: "center", color: "#888" }}>Loading...</div>}>
+      <JoinContent />
+    </Suspense>
   );
 }
