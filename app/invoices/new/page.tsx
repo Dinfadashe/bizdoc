@@ -56,15 +56,17 @@ export default function NewInvoice() {
         discount_type: discountType, discount_value: discountValue,
         tax_rate: taxRate, notes, payment_info: paymentInfo,
         issue_date: issueDate, due_date: dueDate, currency,
+        send_now: sendNow,
       }),
     });
     const data = await res.json();
     setSaving(false);
     if (data.invoice) {
+      // Fire payment link in background — do not await
       if (sendNow && client.email) {
-        await fetch(`/api/invoices/${data.invoice.id}/payment-link`, { method: "POST" });
+        fetch(`/api/invoices/${data.invoice.id}/payment-link`, { method: "POST" }).catch(() => {});
       }
-      router.push(`/invoices/${data.invoice.id}`);
+      router.push(`/invoices/${data.invoice.id}?created=1${sendNow ? "&sent=1" : ""}`);
     }
   };
 
@@ -259,4 +261,5 @@ export default function NewInvoice() {
     </div>
   );
 }
+
 
