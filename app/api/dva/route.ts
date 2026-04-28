@@ -4,9 +4,7 @@ import { createDedicatedVirtualAccount } from "@/lib/paystack";
 
 export async function POST(req: NextRequest) {
   try {
-    const { user_id, email, phone, preferred_bank } = await req.json();
-
-    console.log("DVA request:", { user_id, email, phone, preferred_bank });
+    const { user_id, email, phone, business_name, preferred_bank } = await req.json();
 
     if (!user_id || !email) {
       return NextResponse.json({ error: "user_id and email are required" }, { status: 400 });
@@ -15,6 +13,7 @@ export async function POST(req: NextRequest) {
     const { bank, account_number, account_name, dva_reference } = await createDedicatedVirtualAccount({
       email,
       phone,
+      businessName: business_name,
       preferredBank: preferred_bank ?? "titan-paystack",
     });
 

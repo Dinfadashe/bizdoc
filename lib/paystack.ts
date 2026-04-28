@@ -135,35 +135,49 @@ export async function getBanks() {
 export async function createDedicatedVirtualAccount({
   email,
   phone,
+  businessName,
   preferredBank = "titan-paystack",
 }: {
   email: string;
   phone?: string;
+  businessName?: string;
   preferredBank?: string;
 }) {
-  const phoneNumber = phone
-    ? phone.replace(/^\+/, "")
-    : "08000000000";
+  const phoneNumber = phone ? phone.replace(/^\+/, "") : "08000000000";
 
-  // Step 1 — Create customer
+  // Split business name into first/last for Paystack customer
+  const nameParts = (businessName ?? "Business Owner").trim().split(" ");
+  const firstName = nameParts[0] ?? "Business";
+  const lastName = nameParts.slice(1).join(" ") || "Owner";
+
+  // Step 1 - Create customer with all required fields
   const customerRes = await fetch(`${BASE}/customer`, {
     method: "POST",
     headers: headers(),
-    body: JSON.stringify({ email, phone: phoneNumber }),
+    body: JSON.stringify({
+      email,
+      phone: phoneNumber,
+      first_name: firstName,
+      last_name: lastName,
+    }),
   });
   const customerData = await customerRes.json();
   if (!customerData.status) throw new Error(customerData.message ?? "Failed to create customer");
 
   const customerCode = customerData.data.customer_code;
 
-  // Step 2 — Update customer with phone to ensure it is set
+  // Step 2 - Update customer to ensure all fields are set
   await fetch(`${BASE}/customer/${customerCode}`, {
     method: "PUT",
     headers: headers(),
-    body: JSON.stringify({ phone: phoneNumber }),
+    body: JSON.stringify({
+      phone: phoneNumber,
+      first_name: firstName,
+      last_name: lastName,
+    }),
   });
 
-  // Step 3 — Assign dedicated virtual account
+  // Step 3 - Assign dedicated virtual account
   const dvaRes = await fetch(`${BASE}/dedicated_account`, {
     method: "POST",
     headers: headers(),
@@ -174,8 +188,6 @@ export async function createDedicatedVirtualAccount({
   });
 
   const dvaData = await dvaRes.json();
-
-  // Log full response for debugging
   console.log("DVA response:", JSON.stringify(dvaData));
 
   if (!dvaData.status) throw new Error(dvaData.message ?? "Failed to create virtual account");
