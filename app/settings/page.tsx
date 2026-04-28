@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 interface Bank { name: string; code: string; }
+interface CatalogItem { id?: string; name: string; description: string; unit_price: number; }
 
 export default function Settings() {
   const router = useRouter();
@@ -15,7 +16,11 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
-  const [tab, setTab] = useState<"profile" | "payouts">(searchParams?.get("tab") === "payouts" ? "payouts" : "profile");
+  const [tab, setTab] = useState<"profile" | "payouts" | "catalog" | "team">(
+    searchParams?.get("tab") === "payouts" ? "payouts" :
+    searchParams?.get("tab") === "catalog" ? "catalog" :
+    searchParams?.get("tab") === "team" ? "team" : "profile"
+  );
   const [form, setForm] = useState({ name: "", email: "", phone: "", address: "", currency: "NGN", logo_url: "" });
   const [logoPreview, setLogoPreview] = useState<string>("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -34,7 +39,6 @@ export default function Settings() {
   const [savingPayout, setSavingPayout] = useState(false);
   const [payoutSaved, setPayoutSaved] = useState(false);
 
-  // DVA state
   const [dvaAccountNumber, setDvaAccountNumber] = useState("");
   const [dvaAccountName, setDvaAccountName] = useState("");
   const [dvaBank, setDvaBank] = useState("");
@@ -42,6 +46,20 @@ export default function Settings() {
   const [dvaPreferredBank, setDvaPreferredBank] = useState("titan-paystack");
   const [creatingDva, setCreatingDva] = useState(false);
   const [dvaError, setDvaError] = useState("");
+
+  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [newItem, setNewItem] = useState<CatalogItem>({ name: "", description: "", unit_price: 0 });
+  const [addingItem, setAddingItem] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editItem, setEditItem] = useState<CatalogItem>({ name: "", description: "", unit_price: 0 });
+  const [catalogSaved, setCatalogSaved] = useState("");
+
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState("");
+  const [inviteSent, setInviteSent] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -63,6 +81,12 @@ export default function Settings() {
         setDvaBank(biz.dva_bank ?? "");
         setDvaEmail(biz.email ?? "");
       }
+      setCatalogLoading(true);
+      const { data: catalogData } = await supabase.from("catalog").select("*").eq("user_id", data.user.id).order("name");
+      setCatalog(catalogData ?? []);
+      setCatalogLoading(false);
+      const { data: teamData } = await supabase.from("team_members").select("*").eq("owner_user_id", data.user.id).order("created_at", { ascending: false });
+      setTeamMembers(teamData ?? []);
     });
     fetch("/api/banks").then(r => r.json()).then(d => setBanks(d.banks ?? [])).catch(() => {});
   }, [router]);
@@ -77,7 +101,7 @@ export default function Settings() {
     const localUrl = URL.createObjectURL(file);
     setLogoPreview(localUrl);
     const ext = file.name.split(".").pop();
-    const path = `${userId}/logo.${ext}`;
+    const path = userId + "/logo." + ext;
     const { error: uploadError } = await supabase.storage.from("logos").upload(path, file, { upsert: true });
     if (uploadError) { setLogoError("Upload failed: " + uploadError.message); setUploadingLogo(false); return; }
     const { data: urlData } = supabase.storage.from("logos").getPublicUrl(path);
@@ -107,7 +131,7 @@ export default function Settings() {
       setResolving(true);
       setResolveError("");
       setAccountName("");
-      fetch(`/api/banks/resolve?account_number=${accountNumber}&bank_code=${bankCode}`)
+      fetch("/api/banks/resolve?account_number=" + accountNumber + "&bank_code=" + bankCode)
         .then(r => r.json())
         .then(d => {
           if (d.account_name) setAccountName(d.account_name);
@@ -146,12 +170,7 @@ export default function Settings() {
     const res = await fetch("/api/dva", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_id: userId,
-        email: dvaEmail,
-        phone: form.phone,
-        preferred_bank: dvaPreferredBank,
-      }),
+      body: JSON.stringify({ user_id: userId, email: dvaEmail, phone: form.phone, preferred_bank: dvaPreferredBank }),
     });
     const data = await res.json();
     setCreatingDva(false);
@@ -164,26 +183,75 @@ export default function Settings() {
     }
   };
 
+  const handleAddCatalogItem = async () => {
+    if (!userId || !newItem.name.trim()) return;
+    setAddingItem(true);
+    const { data } = await supabase.from("catalog").insert({ ...newItem, user_id: userId }).select().single();
+    if (data) {
+      setCatalog(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewItem({ name: "", description: "", unit_price: 0 });
+      setCatalogSaved("Added!");
+      setTimeout(() => setCatalogSaved(""), 2000);
+    }
+    setAddingItem(false);
+  };
+
+  const handleUpdateCatalogItem = async (id: string) => {
+    const { data } = await supabase.from("catalog").update(editItem).eq("id", id).select().single();
+    if (data) {
+      setCatalog(prev => prev.map(i => i.id === id ? data : i));
+      setEditingId(null);
+      setCatalogSaved("Saved!");
+      setTimeout(() => setCatalogSaved(""), 2000);
+    }
+  };
+
+  const handleDeleteCatalogItem = async (id: string) => {
+    await supabase.from("catalog").delete().eq("id", id);
+    setCatalog(prev => prev.filter(i => i.id !== id));
+  };
+
+  const handleInvite = async () => {
+    if (!userId || !inviteEmail.trim()) return;
+    setInviting(true);
+    setInviteError("");
+    setInviteSent(false);
+    const res = await fetch("/api/team/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ owner_user_id: userId, member_email: inviteEmail.trim() }),
+    });
+    const data = await res.json();
+    setInviting(false);
+    if (data.ok) {
+      setInviteSent(true);
+      setInviteEmail("");
+      const { data: teamData } = await supabase.from("team_members").select("*").eq("owner_user_id", userId).order("created_at", { ascending: false });
+      setTeamMembers(teamData ?? []);
+    } else {
+      setInviteError(data.error ?? "Failed to send invite");
+    }
+  };
+
   const inputStyle = { width: "100%", padding: "10px 12px", border: "1.5px solid var(--border)", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-body)" };
   const labelStyle = { display: "block" as const, fontSize: 11, fontWeight: 700 as const, textTransform: "uppercase" as const, letterSpacing: "0.8px", color: "var(--muted)", marginBottom: 6 };
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--cream)" }}>
       <nav style={{ background: "var(--green)", padding: "0 28px", height: 60, display: "flex", alignItems: "center", gap: 16 }}>
-        <Link href="/dashboard"><button style={{ background: "none", border: "none", color: "white", cursor: "pointer", fontSize: 20 }}>←</button></Link>
+        <Link href="/dashboard"><button style={{ background: "none", border: "none", color: "white", cursor: "pointer", fontSize: 20 }}>&#8592;</button></Link>
         <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, color: "white" }}>Settings</div>
       </nav>
 
       <div style={{ maxWidth: 640, margin: "0 auto", padding: "32px 20px" }}>
         <div style={{ display: "flex", background: "#e8e4de", borderRadius: 10, padding: 4, gap: 4, marginBottom: 24 }}>
-          {(["profile", "payouts"] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "10px", border: "none", borderRadius: 7, fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "var(--font-body)", background: tab === t ? "white" : "transparent", color: tab === t ? "var(--green)" : "var(--muted)", boxShadow: tab === t ? "0 1px 3px rgba(0,0,0,0.1)" : "none" }}>
-              {t === "payouts" ? "Payout Account" : "Business Profile"}
+          {(["profile", "payouts", "catalog", "team"] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "8px 4px", border: "none", borderRadius: 7, fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "var(--font-body)", background: tab === t ? "white" : "transparent", color: tab === t ? "var(--green)" : "var(--muted)", boxShadow: tab === t ? "0 1px 3px rgba(0,0,0,0.1)" : "none" }}>
+              {t === "payouts" ? "Payout" : t === "catalog" ? "Catalog" : t === "team" ? "Team" : "Profile"}
             </button>
           ))}
         </div>
 
-        {/* Profile Tab */}
         {tab === "profile" && (
           <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
             <div style={{ padding: "14px 24px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>Business Profile</div>
@@ -196,7 +264,7 @@ export default function Settings() {
                       <img src={logoPreview} alt="logo" style={{ width: "100%", height: "100%", objectFit: "contain", padding: 6 }} />
                     ) : (
                       <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 24 }}>🏢</div>
+                        <div style={{ fontSize: 24 }}>&#127962;</div>
                         <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>Click to upload</div>
                       </div>
                     )}
@@ -214,7 +282,6 @@ export default function Settings() {
                 </div>
                 <input ref={logoInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleLogoUpload} />
               </div>
-
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                 <div><label style={labelStyle}>Business Name</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={inputStyle} required /></div>
                 <div><label style={labelStyle}>Email</label><input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} style={inputStyle} /></div>
@@ -239,11 +306,8 @@ export default function Settings() {
           </div>
         )}
 
-        {/* Payouts Tab */}
         {tab === "payouts" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
-            {/* Payout account */}
             <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
               <div style={{ padding: "14px 24px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>Payout Account</div>
               {onboardingComplete && (
@@ -265,7 +329,7 @@ export default function Settings() {
                   <label style={labelStyle}>Bank</label>
                   <select value={bankCode} onChange={e => { const s = banks.find(b => b.code === e.target.value); setBankCode(e.target.value); setBankName(s?.name ?? ""); setAccountName(""); }} style={inputStyle} required>
                     <option value="">Select your bank...</option>
-                    {banks.map((b, idx) => <option key={`${b.code}-${idx}`} value={b.code}>{b.name}</option>)}
+                    {banks.map((b, idx) => <option key={b.code + "-" + idx} value={b.code}>{b.name}</option>)}
                   </select>
                 </div>
                 <div style={{ marginBottom: 16 }}>
@@ -287,12 +351,9 @@ export default function Settings() {
                 </div>
               </form>
             </div>
-
-            {/* DVA Section */}
             {onboardingComplete && (
               <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
                 <div style={{ padding: "14px 24px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>Virtual Account (for direct bank transfers)</div>
-
                 {dvaAccountNumber ? (
                   <div style={{ padding: 24 }}>
                     <div style={{ background: "#e8f0ff", border: "1px solid #b8c8ff", borderRadius: 10, padding: "16px 20px" }}>
@@ -308,7 +369,7 @@ export default function Settings() {
                 ) : (
                   <div style={{ padding: 24 }}>
                     <div style={{ background: "#e8f0ff", border: "1px solid #b8c8ff", borderRadius: 8, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#2255cc" }}>
-                      A dedicated virtual account lets clients pay by direct bank transfer or USSD and still triggers automatic receipt generation. All transfers are tracked by Paystack.
+                      A dedicated virtual account lets clients pay by direct bank transfer or USSD and still triggers automatic receipt generation.
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
                       <div>
@@ -323,11 +384,7 @@ export default function Settings() {
                         </select>
                       </div>
                     </div>
-                    {dvaError && (
-                      <div style={{ background: "#fff0f0", border: "1px solid #ffcccc", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#cc2222", marginBottom: 16 }}>
-                        {dvaError}
-                      </div>
-                    )}
+                    {dvaError && <div style={{ background: "#fff0f0", border: "1px solid #ffcccc", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#cc2222", marginBottom: 16 }}>{dvaError}</div>}
                     <button type="button" onClick={handleCreateDVA} disabled={creatingDva || !dvaEmail} style={{ padding: "11px 24px", background: "#2255cc", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: creatingDva || !dvaEmail ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", opacity: creatingDva || !dvaEmail ? 0.7 : 1 }}>
                       {creatingDva ? "Creating..." : "Generate Virtual Account"}
                     </button>
@@ -337,11 +394,120 @@ export default function Settings() {
             )}
           </div>
         )}
+
+        {tab === "catalog" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+              <div style={{ padding: "14px 24px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>Products & Services Catalog</div>
+              <div style={{ padding: 24 }}>
+                <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 20 }}>Add your products and services here. When creating an invoice, they will auto-suggest as you type.</div>
+                <div style={{ background: "#faf9f7", border: "1px solid var(--border)", borderRadius: 10, padding: 16, marginBottom: 24 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>Add New Item</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                    <div>
+                      <label style={labelStyle}>Name *</label>
+                      <input value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} style={inputStyle} placeholder="e.g. Web Design" />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Unit Price</label>
+                      <input type="number" min={0} value={newItem.unit_price} onChange={e => setNewItem({ ...newItem, unit_price: Number(e.target.value) })} style={inputStyle} placeholder="0.00" />
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={labelStyle}>Description (optional)</label>
+                    <input value={newItem.description} onChange={e => setNewItem({ ...newItem, description: e.target.value })} style={inputStyle} placeholder="Brief description..." />
+                  </div>
+                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    <button type="button" onClick={handleAddCatalogItem} disabled={addingItem || !newItem.name.trim()} style={{ padding: "9px 20px", background: "var(--green)", color: "white", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: addingItem || !newItem.name.trim() ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", opacity: addingItem || !newItem.name.trim() ? 0.7 : 1 }}>
+                      {addingItem ? "Adding..." : "+ Add Item"}
+                    </button>
+                    {catalogSaved && <span style={{ color: "var(--green)", fontSize: 13, fontWeight: 600 }}>{catalogSaved}</span>}
+                  </div>
+                </div>
+                {catalogLoading ? (
+                  <div style={{ textAlign: "center", padding: 40, color: "var(--muted)" }}>Loading...</div>
+                ) : catalog.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: 40, color: "var(--muted)", fontSize: 14 }}>No items yet. Add your first product or service above.</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {catalog.map(item => (
+                      <div key={item.id} style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+                        {editingId === item.id ? (
+                          <div style={{ padding: 14, background: "#f5f9f7" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                              <div><label style={labelStyle}>Name</label><input value={editItem.name} onChange={e => setEditItem({ ...editItem, name: e.target.value })} style={inputStyle} /></div>
+                              <div><label style={labelStyle}>Unit Price</label><input type="number" min={0} value={editItem.unit_price} onChange={e => setEditItem({ ...editItem, unit_price: Number(e.target.value) })} style={inputStyle} /></div>
+                            </div>
+                            <div style={{ marginBottom: 10 }}><label style={labelStyle}>Description</label><input value={editItem.description} onChange={e => setEditItem({ ...editItem, description: e.target.value })} style={inputStyle} /></div>
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <button type="button" onClick={() => handleUpdateCatalogItem(item.id!)} style={{ padding: "7px 16px", background: "var(--green)", color: "white", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)" }}>Save</button>
+                              <button type="button" onClick={() => setEditingId(null)} style={{ padding: "7px 16px", background: "#f5f2ed", color: "var(--text)", border: "1.5px solid var(--border)", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)" }}>Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 700, fontSize: 14 }}>{item.name}</div>
+                              {item.description && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{item.description}</div>}
+                            </div>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: "var(--green)", minWidth: 80, textAlign: "right" }}>{Number(item.unit_price).toLocaleString()}</div>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button type="button" onClick={() => { setEditingId(item.id!); setEditItem({ name: item.name, description: item.description, unit_price: item.unit_price }); }} style={{ padding: "5px 12px", background: "#e8f0ff", color: "#2255cc", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)" }}>Edit</button>
+                              <button type="button" onClick={() => handleDeleteCatalogItem(item.id!)} style={{ padding: "5px 12px", background: "#fff0f0", color: "#cc2222", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)" }}>Delete</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "team" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+              <div style={{ padding: "14px 24px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>Team Members</div>
+              <div style={{ padding: 24 }}>
+                <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 20 }}>Invite staff to create and manage invoices. They cannot access financials, settings, or reports.</div>
+                <div style={{ background: "#faf9f7", border: "1px solid var(--border)", borderRadius: 10, padding: 16, marginBottom: 24 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>Invite Staff Member</div>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <input value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} type="email" placeholder="staff@email.com" style={{ ...inputStyle, flex: 1 }} />
+                    <button type="button" onClick={handleInvite} disabled={inviting || !inviteEmail.trim()} style={{ padding: "10px 20px", background: "var(--green)", color: "white", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: inviting || !inviteEmail.trim() ? "not-allowed" : "pointer", fontFamily: "var(--font-body)", opacity: inviting || !inviteEmail.trim() ? 0.7 : 1, whiteSpace: "nowrap" as const }}>
+                      {inviting ? "Sending..." : "Send Invite"}
+                    </button>
+                  </div>
+                  {inviteError && <div style={{ fontSize: 12, color: "#cc2222", marginTop: 8 }}>{inviteError}</div>}
+                  {inviteSent && <div style={{ fontSize: 12, color: "var(--green)", marginTop: 8, fontWeight: 600 }}>Invite sent successfully!</div>}
+                </div>
+                {teamMembers.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: 40, color: "var(--muted)", fontSize: 14 }}>No team members yet. Invite your first staff member above.</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {teamMembers.map(member => (
+                      <div key={member.id} style={{ border: "1px solid var(--border)", borderRadius: 8, padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14 }}>{member.member_email}</div>
+                          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Role: {member.role} · Status: {member.status}</div>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <span style={{ padding: "3px 10px", background: member.status === "active" ? "var(--green-light)" : "#fff8e8", color: member.status === "active" ? "var(--green)" : "#b36000", borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                            {member.status === "active" ? "Active" : "Pending"}
+                          </span>
+                          <button type="button" onClick={async () => { await fetch("/api/team?id=" + member.id, { method: "DELETE" }); setTeamMembers(prev => prev.filter(m => m.id !== member.id)); }} style={{ padding: "5px 12px", background: "#fff0f0", color: "#cc2222", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)" }}>Remove</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
-
-
-
-
