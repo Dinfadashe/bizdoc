@@ -62,7 +62,7 @@ export default function NewInvoice() {
     const data = await res.json();
     setSaving(false);
     if (data.invoice) {
-      // Fire payment link in background — do not await
+      // Fire payment link in background ï¿½ do not await
       if (sendNow && client.email) {
         fetch(`/api/invoices/${data.invoice.id}/payment-link`, { method: "POST" }).catch(() => {});
       }
