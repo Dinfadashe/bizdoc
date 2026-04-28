@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     const token = crypto.randomUUID();
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://bizdoc-app.netlify.app";
-    const inviteUrl = appUrl.replace(/\\/+$/, "") + "/join?token=" + token;
+    const inviteUrl = appUrl.replace(/\/+$/, "") + "/join?token=" + token;
 
     await supabaseAdmin.from("team_members").insert({
       business_id: business.id,
@@ -62,3 +62,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
