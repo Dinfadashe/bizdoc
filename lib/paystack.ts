@@ -149,7 +149,7 @@ export async function createDedicatedVirtualAccount({
 }) {
   const phoneNumber = phone ? phone.replace(/^\+/, "") : "08000000000";
   const first = firstName ?? (businessName ?? "Business Owner").trim().split(" ")[0] ?? "Business";
-  const last = lastName ?? (businessName ?? "Business Owner").trim().split(" ").slice(1).join(" ") || "Owner";
+  const last = lastName ?? ((businessName ?? "Business Owner").trim().split(" ").slice(1).join(" ") || "Owner");
 
   // Step 1 - Create customer with all required fields
   const customerRes = await fetch(`${BASE}/customer`, {
@@ -219,5 +219,6 @@ export function verifyWebhookSignature(body: string, signature: string): boolean
     .digest("hex");
   return hash === signature;
 }
+
 
 
