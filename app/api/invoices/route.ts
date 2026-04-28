@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
       discount_value = 0,
       tax_rate = 7.5,
       notes, payment_info,
-      issue_date, due_date,
+      issue_date, due_date: due_date || null,
       currency = "NGN",
     } = body;
 
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
         total,
         notes, payment_info,
         issue_date: issue_date ?? new Date().toISOString().split("T")[0],
-        due_date,
+        due_date: due_date || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split("T")[0],
       })
       .select()
       .single();
@@ -68,14 +68,21 @@ export async function POST(req: NextRequest) {
         }));
 
       if (newItems.length > 0) {
-        await supabaseAdmin.from("catalog").insert(newItems).catch(() => {});
+        try { await supabaseAdmin.from("catalog").insert(newItems); } catch(_) {}
       }
     }
 
     return NextResponse.json({ invoice: data });
   } catch (err: unknown) {
+    console.error("Invoice creation error:", err);
+    console.error("Invoice creation error:", err);
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+
+
+
+
 
