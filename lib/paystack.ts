@@ -135,20 +135,21 @@ export async function getBanks() {
 export async function createDedicatedVirtualAccount({
   email,
   phone,
+  firstName,
+  lastName,
   businessName,
   preferredBank = "titan-paystack",
 }: {
   email: string;
   phone?: string;
+  firstName?: string;
+  lastName?: string;
   businessName?: string;
   preferredBank?: string;
 }) {
   const phoneNumber = phone ? phone.replace(/^\+/, "") : "08000000000";
-
-  // Split business name into first/last for Paystack customer
-  const nameParts = (businessName ?? "Business Owner").trim().split(" ");
-  const firstName = nameParts[0] ?? "Business";
-  const lastName = nameParts.slice(1).join(" ") || "Owner";
+  const first = firstName ?? (businessName ?? "Business Owner").trim().split(" ")[0] ?? "Business";
+  const last = lastName ?? (businessName ?? "Business Owner").trim().split(" ").slice(1).join(" ") || "Owner";
 
   // Step 1 - Create customer with all required fields
   const customerRes = await fetch(`${BASE}/customer`, {
@@ -157,8 +158,8 @@ export async function createDedicatedVirtualAccount({
     body: JSON.stringify({
       email,
       phone: phoneNumber,
-      first_name: firstName,
-      last_name: lastName,
+      first_name: first,
+      last_name: last,
     }),
   });
   const customerData = await customerRes.json();
@@ -172,8 +173,8 @@ export async function createDedicatedVirtualAccount({
     headers: headers(),
     body: JSON.stringify({
       phone: phoneNumber,
-      first_name: firstName,
-      last_name: lastName,
+      first_name: first,
+      last_name: last,
     }),
   });
 
@@ -218,4 +219,5 @@ export function verifyWebhookSignature(body: string, signature: string): boolean
     .digest("hex");
   return hash === signature;
 }
+
 
