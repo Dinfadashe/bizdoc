@@ -184,6 +184,7 @@ export async function createDedicatedVirtualAccount({
     body: JSON.stringify({
       customer: customerCode,
       preferred_bank: preferredBank,
+      account_name: businessName ?? undefined,
     }),
   });
 
@@ -217,3 +218,4 @@ export function verifyWebhookSignature(body: string, signature: string): boolean
     .digest("hex");
   return hash === signature;
 }
+
