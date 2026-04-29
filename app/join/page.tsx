@@ -72,7 +72,7 @@ function JoinContent() {
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f5f2ed", padding: 20 }}>
       <div style={{ background: "white", borderRadius: 14, padding: 40, maxWidth: 420, width: "100%", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <div style={{ fontSize: 32, fontWeight: 800, color: "#1a4a2e", marginBottom: 8 }}>BizDoc</div>
+          <img src="/logo.png" alt="BizDoc" style={{ width: 120, height: "auto", marginBottom: 8 }} />
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Join {businessName}</div>
           <div style={{ fontSize: 13, color: "#888" }}>You have been invited to join as a staff member</div>
         </div>

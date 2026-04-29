@@ -291,8 +291,11 @@ export default function Dashboard() {
           {business?.logo_url && (
             <img src={business.logo_url} alt="logo" style={{ width: 32, height: 32, borderRadius: 6, objectFit: "contain", background: "white", padding: 2 }} />
           )}
-          <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, color: "white" }}>
-            {business?.name || "BizDoc"}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <img src="/logo.png" alt="BizDoc" style={{ width: 36, height: 36, objectFit: "contain", borderRadius: 6, background: "white", padding: 2 }} />
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "white" }}>
+              {business?.name || "BizDoc"}
+            </div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -438,6 +441,7 @@ export default function Dashboard() {
     </div>
   );
 }
+
 
 
 

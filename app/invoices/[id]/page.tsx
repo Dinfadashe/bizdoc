@@ -337,7 +337,7 @@ export default function InvoiceDetail() {
             )}
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "1px", color: "var(--muted)", marginBottom: 8 }}>Payment Options</div>
-              {business?.dva_account_number ? (
+              {business?.dva_account_number && invoice.currency === "NGN" ? (
                 <div style={{ background: "#e8f0ff", border: "1px solid #b8c8ff", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#2255cc", marginBottom: 6, textTransform: "uppercase" as const, letterSpacing: "0.8px" }}>Bank Transfer / USSD</div>
                   <div style={{ fontSize: 13, color: "#1a1a1a", lineHeight: 2 }}>
@@ -348,7 +348,7 @@ export default function InvoiceDetail() {
                   <div style={{ fontSize: 11, color: "#2255cc", marginTop: 6 }}>Transfer exact amount — receipt will be sent automatically.</div>
 
                 </div>
-              ) : business?.account_name ? (
+              ) : business?.account_name && invoice.currency === "NGN" ? (
                 <div style={{ background: "var(--green-light)", border: "1px solid #b8dfc9", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "var(--green)", marginBottom: 6, textTransform: "uppercase" as const, letterSpacing: "0.8px" }}>Bank Transfer / USSD</div>
                   <div style={{ fontSize: 13, color: "#1a1a1a", lineHeight: 2 }}>
@@ -356,6 +356,14 @@ export default function InvoiceDetail() {
                     <span style={{ color: "var(--muted)" }}>Account No: </span><strong style={{ fontFamily: "monospace", fontSize: 15, letterSpacing: 1 }}>{business.account_number}</strong><br />
                     <span style={{ color: "var(--muted)" }}>Account Name: </span><strong>{business.account_name}</strong>
                   </div>
+                </div>
+              ) : invoice.currency !== "NGN" ? (
+                <div style={{ background: "#e8f0ff", border: "1px solid #b8c8ff", borderRadius: 8, padding: "12px 14px" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#2255cc", marginBottom: 6, textTransform: "uppercase" as const, letterSpacing: "0.8px" }}>International Payment</div>
+                  <div style={{ fontSize: 13, color: "#1a1a1a", lineHeight: 1.8 }}>
+                    This invoice is in <strong>{invoice.currency}</strong>. Use the payment link above to pay securely via card.
+                  </div>
+                  {invoice.payment_info && <div style={{ fontSize: 12, color: "#555", marginTop: 8 }}>{invoice.payment_info}</div>}
                 </div>
               ) : (
                 <div style={{ fontSize: 13, color: "var(--muted)" }}>
@@ -368,7 +376,7 @@ export default function InvoiceDetail() {
             </div>
           </div>
 
-          {getUssdCodes().length > 0 && business?.dva_account_number && (
+          {getUssdCodes().length > 0 && business?.dva_account_number && invoice.currency === "NGN" && (
             <div style={{ padding: "12px 32px", borderTop: "1px solid var(--border)", background: "#f0f4ff" }}>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "#2255cc", marginBottom: 8 }}>USSD Payment Codes — dial any code to pay, no internet required</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
@@ -396,6 +404,7 @@ export default function InvoiceDetail() {
     </div></div>
   );
 }
+
 
 
 
