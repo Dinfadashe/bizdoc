@@ -1,4 +1,6 @@
-"use client";
+const fs = require('fs');
+
+const content = `"use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
@@ -79,7 +81,7 @@ export default function Home() {
 
   return (
     <div style={{ background: "#0a1a0f", color: "#fff", fontFamily: "Georgia, serif", overflowX: "hidden" }}>
-      <style>{`
+      <style>{\`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
         body{font-family:'DM Sans',sans-serif}
@@ -136,7 +138,7 @@ export default function Home() {
           .auth-cta-h{font-size:30px!important}
           .cpill{padding:10px 18px!important}
         }
-      `}</style>
+      \`}</style>
 
       {/* NAV */}
       <nav style={{position:"sticky",top:0,background:"rgba(10,26,15,0.95)",backdropFilter:"blur(12px)",zIndex:100,borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
@@ -405,4 +407,7 @@ export default function Home() {
       </footer>
     </div>
   );
-}
+}`;
+
+fs.writeFileSync('app/page.tsx', content, { encoding: 'utf8' });
+console.log('Done');
