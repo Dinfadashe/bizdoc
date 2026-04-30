@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { sendInvoiceEmail } from "@/lib/email";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
+const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://bizdoc-app.netlify.app").replace(/\/+$/, "");
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const { data: business } = await supabaseAdmin
       .from("businesses")
-      .select("subaccount_code, name")
+      .select("*")
       .eq("user_id", invoice.user_id)
       .single();
 
@@ -28,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       amount: amountKobo,
       currency: invoice.currency || "NGN",
       metadata: { invoice_id: id },
-      callback_url: process.env.NEXT_PUBLIC_APP_URL + "/invoices/" + id + "/pay",
+      callback_url: APP_URL + "/invoices/" + id + "/pay",
     };
 
     if (business?.subaccount_code && invoice.currency === "NGN") {
@@ -36,6 +38,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       body.bearer = "subaccount";
       body.transaction_charge = Math.round(amountKobo * 0.02);
     }
+
+    let paymentUrl: string | null = null;
 
     const res = await fetch("https://api.paystack.co/transaction/initialize", {
       method: "POST",
@@ -47,19 +51,50 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
 
     const data = await res.json();
-    if (!data.status) throw new Error(data.message ?? "Paystack error");
 
-    await supabaseAdmin
-      .from("invoices")
-      .update({
+    if (!data.status && business?.subaccount_code) {
+      // Retry without subaccount
+      delete body.subaccount;
+      delete body.bearer;
+      delete body.transaction_charge;
+      const res2 = await fetch("https://api.paystack.co/transaction/initialize", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + PAYSTACK_SECRET,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      const data2 = await res2.json();
+      if (!data2.status) throw new Error(data2.message ?? "Paystack error");
+      paymentUrl = data2.data.authorization_url;
+      await supabaseAdmin.from("invoices").update({
         status: "sent",
-        payment_url: data.data.authorization_url,
+        payment_url: paymentUrl,
+        paystack_access_code: data2.data.access_code,
+        paystack_reference: data2.data.reference,
+      }).eq("id", id);
+    } else {
+      if (!data.status) throw new Error(data.message ?? "Paystack error");
+      paymentUrl = data.data.authorization_url;
+      await supabaseAdmin.from("invoices").update({
+        status: "sent",
+        payment_url: paymentUrl,
         paystack_access_code: data.data.access_code,
         paystack_reference: data.data.reference,
-      })
-      .eq("id", id);
+      }).eq("id", id);
+    }
 
-    return NextResponse.json({ payment_url: data.data.authorization_url });
+    // Send invoice email to client with payment link
+    if (invoice.client_email && business && paymentUrl) {
+      console.log("Sending invoice email to:", invoice.client_email);
+      const emailResult = await sendInvoiceEmail(invoice, business, paymentUrl);
+      console.log("Invoice email result:", JSON.stringify(emailResult));
+    } else {
+      console.log("Skipping email - missing:", { email: invoice.client_email, business: !!business, paymentUrl });
+    }
+
+    return NextResponse.json({ payment_url: paymentUrl });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("Payment link error:", err);
