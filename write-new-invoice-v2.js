@@ -1,4 +1,6 @@
-"use client";
+const fs = require('fs');
+
+const content = `"use client";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
@@ -280,4 +282,7 @@ export default function NewInvoice() {
       </div>
     </div>
   );
-}
+}`;
+
+fs.writeFileSync('app/invoices/new/page.tsx', content, { encoding: 'utf8' });
+console.log('Done new invoice page');

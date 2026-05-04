@@ -1,4 +1,6 @@
-"use client";
+const fs = require('fs');
+
+const content = `"use client";
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState, useRef } from "react";
@@ -352,4 +354,7 @@ export default function Settings() {
       </div>
     </div>
   );
-}
+}`;
+
+fs.writeFileSync('app/settings/page.tsx', content, { encoding: 'utf8' });
+console.log('Done settings');
