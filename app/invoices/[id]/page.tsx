@@ -22,6 +22,7 @@ export default function InvoiceDetail() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [business, setBusiness] = useState<{ name: string; email: string; phone: string; address: string; logo_url: string; account_name: string; account_number: string; bank_name: string; dva_account_number: string; dva_account_name: string; dva_bank: string } | null>(null);
+  const [bizAccounts, setBizAccounts] = useState<{ id: string; account_name: string; account_number: string; bank_name: string; currency: string; is_default: boolean }[]>([]);
   const [loading, setLoading] = useState(true);
   const [sendingLink, setSendingLink] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -35,6 +36,10 @@ export default function InvoiceDetail() {
     setInvoice(inv);
     const { data: biz } = await supabase.from("businesses").select("*").eq("user_id", inv.user_id).single();
     setBusiness(biz);
+    // Load business-connected accounts (NGN, default first)
+    const acctRes = await fetch("/api/business-accounts?user_id=" + inv.user_id);
+    const acctData = await acctRes.json();
+    setBizAccounts(acctData.accounts ?? []);
     const { data: rec } = await supabase.from("receipts").select("*").eq("invoice_id", id).single();
     setReceipt(rec);
     setLoading(false);
@@ -115,18 +120,31 @@ export default function InvoiceDetail() {
     }
   };
 
+  // Determine the best NGN account to show: default bizAccount > first bizAccount > fallback DVA > fallback legacy
+  const activeAccount = (() => {
+    const ngn = bizAccounts.filter(a => !a.currency || a.currency === "NGN");
+    const def = ngn.find(a => a.is_default) ?? ngn[0];
+    if (def) return { account_number: def.account_number, account_name: def.account_name, bank_name: def.bank_name };
+    if (business?.dva_account_number) return { account_number: business.dva_account_number, account_name: business.dva_account_name, bank_name: business.dva_bank };
+    if (business?.account_number) return { account_number: business.account_number, account_name: business.account_name, bank_name: business.bank_name };
+    return null;
+  })();
+
   const getUssdCodes = () => {
-    if (!business?.dva_account_number) return [];
-    const acc = business.dva_account_number;
-    const amount = invoice?.total ?? 0;
-    const amt = Math.round(Number(amount));
+    if (!activeAccount?.account_number) return [];
+    const acc = activeAccount.account_number;
+    const amt = Math.round(Number(invoice?.total ?? 0));
+    // Each entry: the bank the SENDER dials from to transfer to ANY account
+    // Format: "If you bank with X, dial this code"
     return [
-      { bank: "GTBank", code: `*737*2*${amt}*${acc}#` },
-      { bank: "Zenith Bank", code: `*966*${amt}*${acc}#` },
-      { bank: "Access Bank", code: `*901*000*${acc}*${amt}#` },
-      { bank: "First Bank", code: `*894*${acc}*${amt}#` },
-      { bank: "UBA", code: `*919*3*${acc}*${amt}#` },
-      { bank: "OPay", code: `*955*${acc}*${amt}#` },
+      { bank: "GTBank sender",    code: `*737*2*${amt}*${acc}#`,          label: "GTBank" },
+      { bank: "Zenith sender",    code: `*966*${amt}*${acc}#`,            label: "Zenith Bank" },
+      { bank: "Access sender",    code: `*901*000*${acc}*${amt}#`,        label: "Access Bank" },
+      { bank: "First Bank sender",code: `*894*${acc}*${amt}#`,            label: "First Bank" },
+      { bank: "UBA sender",       code: `*919*3*${acc}*${amt}#`,          label: "UBA" },
+      { bank: "OPay sender",      code: `*955*${acc}*${amt}#`,            label: "OPay" },
+      { bank: "Kuda sender",      code: `*5573*${acc}*${amt}#`,           label: "Kuda" },
+      { bank: "Sterling sender",  code: `*822*3*${acc}*${amt}#`,          label: "Sterling" },
     ];
   };
 
@@ -374,25 +392,15 @@ export default function InvoiceDetail() {
             )}
             <div>
               <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const, letterSpacing: "1px", color: "var(--muted)", marginBottom: 8 }}>Payment Options</div>
-              {business?.dva_account_number && invoice.currency === "NGN" ? (
+              {activeAccount && invoice.currency === "NGN" ? (
                 <div style={{ background: "#e8f0ff", border: "1px solid #b8c8ff", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#2255cc", marginBottom: 6, textTransform: "uppercase" as const, letterSpacing: "0.8px" }}>Bank Transfer / USSD</div>
                   <div style={{ fontSize: 13, color: "#1a1a1a", lineHeight: 2 }}>
-                    <span style={{ color: "var(--muted)" }}>Bank: </span><strong>{business.dva_bank}</strong><br />
-                    <span style={{ color: "var(--muted)" }}>Account No: </span><strong style={{ fontFamily: "monospace", fontSize: 15, letterSpacing: 1 }}>{business.dva_account_number}</strong><br />
-                    <span style={{ color: "var(--muted)" }}>Account Name: </span><strong>{business.dva_account_name}</strong>
+                    <span style={{ color: "var(--muted)" }}>Bank: </span><strong>{activeAccount.bank_name}</strong><br />
+                    <span style={{ color: "var(--muted)" }}>Account No: </span><strong style={{ fontFamily: "monospace", fontSize: 15, letterSpacing: 1 }}>{activeAccount.account_number}</strong><br />
+                    <span style={{ color: "var(--muted)" }}>Account Name: </span><strong>{activeAccount.account_name}</strong>
                   </div>
                   <div style={{ fontSize: 11, color: "#2255cc", marginTop: 6 }}>Transfer exact amount — receipt will be sent automatically.</div>
-
-                </div>
-              ) : business?.account_name && invoice.currency === "NGN" ? (
-                <div style={{ background: "var(--green-light)", border: "1px solid #b8dfc9", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "var(--green)", marginBottom: 6, textTransform: "uppercase" as const, letterSpacing: "0.8px" }}>Bank Transfer / USSD</div>
-                  <div style={{ fontSize: 13, color: "#1a1a1a", lineHeight: 2 }}>
-                    <span style={{ color: "var(--muted)" }}>Bank: </span><strong>{business.bank_name}</strong><br />
-                    <span style={{ color: "var(--muted)" }}>Account No: </span><strong style={{ fontFamily: "monospace", fontSize: 15, letterSpacing: 1 }}>{business.account_number}</strong><br />
-                    <span style={{ color: "var(--muted)" }}>Account Name: </span><strong>{business.account_name}</strong>
-                  </div>
                 </div>
               ) : invoice.currency !== "NGN" ? (
                 <div style={{ background: "#e8f0ff", border: "1px solid #b8c8ff", borderRadius: 8, padding: "12px 14px" }}>
@@ -413,17 +421,18 @@ export default function InvoiceDetail() {
             </div>
           </div>
 
-          {getUssdCodes().length > 0 && business?.dva_account_number && invoice.currency === "NGN" && (
+          {getUssdCodes().length > 0 && activeAccount && invoice.currency === "NGN" && (
             <div style={{ padding: "12px 32px", borderTop: "1px solid var(--border)", background: "#f0f4ff" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "#2255cc", marginBottom: 8 }}>USSD Payment Codes — dial any code to pay, no internet required</div>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "#2255cc", marginBottom: 8 }}>USSD Payment — dial from your bank to transfer to {activeAccount.bank_name} · {activeAccount.account_number}</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
-                {getUssdCodes().map(({ bank, code }) => (
-                  <div key={bank} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px", background: "white", borderRadius: 4, border: "1px solid #b8c8ff" }}>
-                    <div style={{ fontSize: 11, color: "#555", fontWeight: 600 }}>{bank}</div>
+                {getUssdCodes().map(({ label, code }) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px", background: "white", borderRadius: 4, border: "1px solid #b8c8ff" }}>
+                    <div style={{ fontSize: 11, color: "#555", fontWeight: 600 }}>{label}</div>
                     <div style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: "#1a1a1a" }}>{code}</div>
                   </div>
                 ))}
               </div>
+              <div style={{ fontSize: 10, color: "#555", marginTop: 6 }}>Each code is for senders banking with that institution — the destination is always your {activeAccount.bank_name} account.</div>
             </div>
           )}
           {invoice.payment_url && invoice.status !== "paid" && (
@@ -441,14 +450,3 @@ export default function InvoiceDetail() {
     </div></div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
