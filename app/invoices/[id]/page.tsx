@@ -442,7 +442,7 @@ export default function InvoiceDetail() {
                   Pay Now — {formatCurrency(invoice.total, invoice.currency)}
                 </button>
               </a>
-              <div style={{ color: "#2e7d52", fontSize: 12, marginTop: 8 }}>Secured by Paystack · Cards, Bank Transfer, USSD</div>
+              <div style={{ color: "#2e7d52", fontSize: 12, marginTop: 8 }}>Cards, Bank Transfer, USSD</div>
             </div>
           )}
         </div>

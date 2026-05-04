@@ -78,8 +78,9 @@ export async function sendInvoiceEmail(
         <!-- Pay button -->
         <div style="text-align:center;margin:32px 0">
           <a href="${paymentUrl}" style="display:inline-block;background:#1a4a2e;color:white;padding:14px 36px;border-radius:8px;font-size:15px;font-weight:700;text-decoration:none;letter-spacing:0.3px">
-            Pay Now — ${formatCurrency(invoice.total, invoice.currency)}
+            View Invoice &amp; Pay — ${formatCurrency(invoice.total, invoice.currency)}
           </a>
+          <div style="margin-top:10px;font-size:12px;color:#999">Opens your invoice with bank transfer and USSD payment details</div>
         </div>
 
         ${invoice.notes ? `<div style="background:#f5f2ed;border-radius:8px;padding:16px;font-size:13px;color:#666;margin-top:16px"><strong style="display:block;margin-bottom:4px;color:#1a1a1a">Notes</strong>${invoice.notes}</div>` : ""}
