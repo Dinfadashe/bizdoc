@@ -150,6 +150,38 @@ export default function InvoiceDetail() {
 
   const handlePrint = () => window.print();
 
+  const [downloading, setDownloading] = useState(false);
+  const handleDownload = async () => {
+    const invoiceEl = document.getElementById("invoice-doc");
+    if (!invoiceEl || !invoice) return;
+    setDownloading(true);
+    try {
+      const canvas = await html2canvas(invoiceEl, { scale: 2.5, useCORS: true, backgroundColor: "#ffffff", logging: false });
+      const imgData = canvas.toDataURL("image/png", 1.0);
+      const { jsPDF } = await import("jspdf");
+      // A4 page: 210 x 297 mm
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgW = pageW;
+      const imgH = (canvas.height * imgW) / canvas.width;
+      // If taller than a page, scale to fit; otherwise centre vertically
+      if (imgH <= pageH) {
+        pdf.addImage(imgData, "PNG", 0, 0, imgW, imgH);
+      } else {
+        // Multi-page split
+        let y = 0;
+        while (y < imgH) {
+          if (y > 0) pdf.addPage();
+          pdf.addImage(imgData, "PNG", 0, -y, imgW, imgH);
+          y += pageH;
+        }
+      }
+      pdf.save(invoice.invoice_number + ".pdf");
+    } catch (err) { console.error("Download failed:", err); }
+    setDownloading(false);
+  };
+
   if (loading) return <div style={{ padding: 60, textAlign: "center", color: "var(--muted)" }}>Loading...</div>;
   if (!invoice) return null;
 
@@ -189,6 +221,14 @@ export default function InvoiceDetail() {
           {invoice.invoice_number}
         </div>
         <div style={{ display: "flex", gap: 10 }}>
+          {invoice.status === "draft" && (
+            <button onClick={() => router.push(`/invoices/${id}/edit`)} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "7px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>
+              ✏️ Edit
+            </button>
+          )}
+          <button onClick={handleDownload} disabled={downloading} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "7px 14px", borderRadius: 6, cursor: downloading ? "not-allowed" : "pointer", fontSize: 13, fontFamily: "var(--font-body)", opacity: downloading ? 0.7 : 1 }}>
+            {downloading ? "Downloading..." : "⬇ Download"}
+          </button>
           <button onClick={handlePrint} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "7px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>
             Print
           </button>
