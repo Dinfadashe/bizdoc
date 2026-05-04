@@ -235,17 +235,21 @@ export default function PayPage() {
 
                   {/* USSD */}
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 6 }}>USSD — No Internet Required</div>
-                    <div style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>Dial the code for YOUR bank to transfer to {activeAccount!.bank_name}:</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#555", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 4 }}>USSD — No Internet Required</div>
+                    <div style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>
+                      Tap the code for <strong>YOUR bank</strong> — it opens your dialer ready to dial. Your bank will ask you to confirm the account and enter your PIN to complete.
+                    </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
                       {getUssdCodes().map(({ label, code }) => (
-                        <div key={label} onClick={() => copy(code, label)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", background: copiedField === label ? "#e8f5ef" : "#f5f9ff", border: `1px solid ${copiedField === label ? "#b8dfc9" : "#b8c8ff"}`, borderRadius: 6, cursor: "pointer", transition: "background 0.15s" }}>
-                          <span style={{ fontSize: 11, color: "#555", fontWeight: 600 }}>{label}</span>
-                          <span style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: copiedField === label ? "#1a6b4a" : "#1a1a1a" }}>{copiedField === label ? "Copied!" : code}</span>
-                        </div>
+                        <a key={label} href={`tel:${code}`} style={{ textDecoration: "none" }}>
+                          <div style={{ display: "flex", flexDirection: "column", padding: "8px 10px", background: "#f5f9ff", border: "1px solid #b8c8ff", borderRadius: 6, cursor: "pointer" }}>
+                            <span style={{ fontSize: 11, color: "#2255cc", fontWeight: 700 }}>{label}</span>
+                            <span style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: "#1a1a1a", marginTop: 2 }}>{code}</span>
+                          </div>
+                        </a>
                       ))}
                     </div>
-                    <div style={{ fontSize: 11, color: "#aaa", marginTop: 8 }}>Tap any code to copy it.</div>
+                    <div style={{ fontSize: 11, color: "#aaa", marginTop: 8 }}>⚠️ Use only the code for your own bank. After dialing, follow your bank's prompts and enter your PIN.</div>
                   </div>
                 </div>
               </div>

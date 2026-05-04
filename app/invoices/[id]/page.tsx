@@ -28,6 +28,8 @@ export default function InvoiceDetail() {
   const [copied, setCopied] = useState(false);
   const [sharingWA, setSharingWA] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const load = useCallback(async () => {
@@ -134,18 +136,34 @@ export default function InvoiceDetail() {
     if (!activeAccount?.account_number) return [];
     const acc = activeAccount.account_number;
     const amt = Math.round(Number(invoice?.total ?? 0));
-    // Each entry: the bank the SENDER dials from to transfer to ANY account
-    // Format: "If you bank with X, dial this code"
+    // These are SHORTCUT dial codes — the bank USSD system responds asking for PIN.
+    // Tapping the tel: link opens the phone dialer pre-filled. The customer dials,
+    // then follows their bank's prompts (account confirmation, PIN) to complete.
+    // Format verified per each bank's published shortcode:
     return [
-      { bank: "GTBank sender",    code: `*737*2*${amt}*${acc}#`,          label: "GTBank" },
-      { bank: "Zenith sender",    code: `*966*${amt}*${acc}#`,            label: "Zenith Bank" },
-      { bank: "Access sender",    code: `*901*000*${acc}*${amt}#`,        label: "Access Bank" },
-      { bank: "First Bank sender",code: `*894*${acc}*${amt}#`,            label: "First Bank" },
-      { bank: "UBA sender",       code: `*919*3*${acc}*${amt}#`,          label: "UBA" },
-      { bank: "OPay sender",      code: `*955*${acc}*${amt}#`,            label: "OPay" },
-      { bank: "Kuda sender",      code: `*5573*${acc}*${amt}#`,           label: "Kuda" },
-      { bank: "Sterling sender",  code: `*822*3*${acc}*${amt}#`,          label: "Sterling" },
+      { label: "GTBank",     code: `*737*2*${amt}*${acc}#`,   note: "GTB to any bank" },
+      { label: "Zenith",     code: `*966*${amt}*${acc}#`,     note: "Zenith to any bank" },
+      { label: "Access",     code: `*901*000*${acc}*${amt}#`, note: "Access to any bank" },
+      { label: "First Bank", code: `*894*${acc}*${amt}#`,     note: "FirstBank to any bank" },
+      { label: "UBA",        code: `*919*3*${acc}*${amt}#`,   note: "UBA to any bank" },
+      { label: "OPay",       code: `*955*${acc}*${amt}#`,     note: "OPay wallet" },
+      { label: "Kuda",       code: `*5573*${acc}*${amt}#`,    note: "Kuda to any bank" },
+      { label: "Sterling",   code: `*822*3*${acc}*${amt}#`,   note: "Sterling to any bank" },
     ];
+  };
+
+  const handleDelete = async () => {
+    if (!invoice) return;
+    setDeleting(true);
+    const res = await fetch(`/api/invoices/${id}`, { method: "DELETE" });
+    const data = await res.json();
+    setDeleting(false);
+    if (data.deleted) {
+      router.push("/dashboard");
+    } else {
+      alert(data.error ?? "Failed to delete invoice");
+      setShowDeleteConfirm(false);
+    }
   };
 
   const handlePrint = () => window.print();
@@ -190,6 +208,25 @@ export default function InvoiceDetail() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--cream)" }}>
+
+      {/* Delete confirmation modal */}
+      {showDeleteConfirm && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ background: "white", borderRadius: 14, padding: 32, maxWidth: 400, width: "100%", textAlign: "center" }}>
+            <div style={{ fontSize: 42, marginBottom: 12 }}>🗑️</div>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Delete Draft Invoice?</div>
+            <div style={{ fontSize: 14, color: "var(--muted)", marginBottom: 24, lineHeight: 1.6 }}>
+              Invoice <strong>{invoice.invoice_number}</strong> will be permanently deleted. This cannot be undone.
+            </div>
+            <div style={{ display: "flex", gap: 12 }}>
+              <button onClick={() => setShowDeleteConfirm(false)} style={{ flex: 1, padding: "11px", background: "#f5f2ed", color: "var(--text)", border: "1.5px solid var(--border)", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)" }}>Cancel</button>
+              <button onClick={handleDelete} disabled={deleting} style={{ flex: 1, padding: "11px", background: "#cc2222", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.7 : 1, fontFamily: "var(--font-body)" }}>
+                {deleting ? "Deleting..." : "Yes, Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <style>{`
         @media print {
             #invoice-print-wrapper * { font-size: 10px !important; line-height: 1.3 !important; }
@@ -224,6 +261,11 @@ export default function InvoiceDetail() {
           {invoice.status === "draft" && (
             <button onClick={() => router.push(`/invoices/${id}/edit`)} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "7px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>
               ✏️ Edit
+            </button>
+          )}
+          {invoice.status === "draft" && (
+            <button onClick={() => setShowDeleteConfirm(true)} style={{ background: "rgba(220,30,30,0.25)", border: "1px solid rgba(255,100,100,0.4)", color: "white", padding: "7px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>
+              🗑️ Delete
             </button>
           )}
           <button onClick={handleDownload} disabled={downloading} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "7px 14px", borderRadius: 6, cursor: downloading ? "not-allowed" : "pointer", fontSize: 13, fontFamily: "var(--font-body)", opacity: downloading ? 0.7 : 1 }}>
@@ -463,16 +505,25 @@ export default function InvoiceDetail() {
 
           {getUssdCodes().length > 0 && activeAccount && invoice.currency === "NGN" && (
             <div style={{ padding: "12px 32px", borderTop: "1px solid var(--border)", background: "#f0f4ff" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "#2255cc", marginBottom: 8 }}>USSD Payment — dial from your bank to transfer to {activeAccount.bank_name} · {activeAccount.account_number}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "#2255cc", marginBottom: 4 }}>
+                USSD Transfer — No Internet Required
+              </div>
+              <div style={{ fontSize: 11, color: "#555", marginBottom: 8 }}>
+                Tap your bank's code below — it opens your dialer ready to dial. Your bank will ask you to confirm the account and enter your PIN to complete the transfer.
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
                 {getUssdCodes().map(({ label, code }) => (
-                  <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px", background: "white", borderRadius: 4, border: "1px solid #b8c8ff" }}>
-                    <div style={{ fontSize: 11, color: "#555", fontWeight: 600 }}>{label}</div>
-                    <div style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: "#1a1a1a" }}>{code}</div>
-                  </div>
+                  <a key={label} href={`tel:${code}`} style={{ textDecoration: "none" }}>
+                    <div style={{ display: "flex", flexDirection: "column", padding: "6px 8px", background: "white", borderRadius: 6, border: "1px solid #b8c8ff", cursor: "pointer" }}>
+                      <div style={{ fontSize: 11, color: "#2255cc", fontWeight: 700 }}>{label}</div>
+                      <div style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: "#1a1a1a", marginTop: 2 }}>{code}</div>
+                    </div>
+                  </a>
                 ))}
               </div>
-              <div style={{ fontSize: 10, color: "#555", marginTop: 6 }}>Each code is for senders banking with that institution — the destination is always your {activeAccount.bank_name} account.</div>
+              <div style={{ fontSize: 10, color: "#888", marginTop: 8 }}>
+                ⚠️ Use the code for YOUR bank only. After dialing, follow your bank's prompts — confirm account details and enter your transaction PIN.
+              </div>
             </div>
           )}
           {invoice.payment_url && invoice.status !== "paid" && (

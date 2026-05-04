@@ -14,8 +14,31 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   try {
     const body = await req.json();
-    const { status, paid_at, payment_method } = body;
+    const { status, paid_at, payment_method, ...editFields } = body;
 
+    // Draft invoice edit — update all invoice fields
+    if (!status && !paid_at) {
+      const { client_name, client_email, client_phone, client_address, items, discount_type, discount_value,
+        tax_rate, notes, issue_date, due_date, currency, display_account_id, subtotal, discount_amount, tax_amount, total } = editFields;
+
+      const { data: invoice, error } = await supabaseAdmin
+        .from("invoices")
+        .update({
+          client_name, client_email, client_phone, client_address,
+          items, discount_type, discount_value, tax_rate, notes,
+          issue_date, due_date, currency, display_account_id,
+          subtotal, discount_amount, tax_amount, total,
+        })
+        .eq("id", id)
+        .eq("status", "draft") // safety: only allow editing drafts
+        .select()
+        .single();
+
+      if (error) throw error;
+      return NextResponse.json({ invoice });
+    }
+
+    // Status update (mark as paid, etc.)
     const { data: invoice, error } = await supabaseAdmin
       .from("invoices")
       .update({ status, paid_at })
@@ -54,6 +77,33 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     return NextResponse.json({ invoice });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  try {
+    // Only draft invoices can be deleted
+    const { data: invoice, error: fetchError } = await supabaseAdmin
+      .from("invoices")
+      .select("status, user_id")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    if (invoice.status !== "draft") {
+      return NextResponse.json(
+        { error: invoice.status === "paid" ? "Paid invoices cannot be deleted." : "Only draft invoices can be deleted. Pending invoices expire naturally." },
+        { status: 403 }
+      );
+    }
+
+    const { error } = await supabaseAdmin.from("invoices").delete().eq("id", id);
+    if (error) throw error;
+    return NextResponse.json({ deleted: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
