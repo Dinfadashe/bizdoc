@@ -304,6 +304,21 @@ export default function Dashboard() {
               Catalog
             </button>
           </Link>
+          <Link href="/inventory">
+            <button style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>
+              Inventory
+            </button>
+          </Link>
+          <Link href="/expenses">
+            <button style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>
+              Expenses
+            </button>
+          </Link>
+          <Link href="/stats">
+            <button style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>
+              Statistics
+            </button>
+          </Link>
           <Link href="/subscribe">
             <button style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>
               Subscription
@@ -446,6 +461,7 @@ export default function Dashboard() {
     </div>
   );
 }
+
 
 
 
