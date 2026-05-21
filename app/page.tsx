@@ -24,7 +24,14 @@ export default function Home() {
   const [attempts, setAttempts] = useState(0);
   const [countdown, setCountdown] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [referralCode, setReferralCode] = useState<string>("");
   const router = useRouter();
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const ref = urlParams.get("ref");
+    if (ref) setReferralCode(ref);
+  }, []);
 
   useEffect(() => {
     const sl = localStorage.getItem(LOCKOUT_KEY);
@@ -69,6 +76,10 @@ export default function Home() {
       if (error) { setMsg(error.message); setLoading(false); return; }
       if (data.user) {
         await supabase.from("businesses").insert({ user_id: data.user.id, name: businessName, email, phone, address, currency: "NGN", onboarding_complete: false });
+        // Apply referral if present
+        if (referralCode) {
+          await fetch("/api/referral", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ referral_code: referralCode, business_user_id: data.user.id, business_email: email }) }).catch(() => {});
+        }
       }
       setMsg("Account created! Check your email to confirm, then sign in.");
     }

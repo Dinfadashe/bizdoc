@@ -15,9 +15,14 @@ export default function Subscribe() {
   const [subscription, setSubscription] = useState<any>(null);
   const [plan, setPlan] = useState<"monthly"|"annual">("monthly");
   const [usdRate, setUsdRate] = useState<number>(1500);
+  const [referralCode, setReferralCode] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Get referral code from URL or business
+    const urlParams = new URLSearchParams(window.location.search);
+    const refFromUrl = urlParams.get("ref");
+    if (refFromUrl) setReferralCode(refFromUrl);
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) { router.push("/"); return; }
       setUserId(data.user.id);
@@ -34,7 +39,9 @@ export default function Subscribe() {
   }, []);
 
   const handleSubscribe = () => {
-    const url = PAYSTACK_LINK + "?metadata=" + encodeURIComponent(JSON.stringify({ user_id: userId, plan }));
+    const meta: any = { user_id: userId, plan };
+    if (referralCode) meta.referral_code = referralCode;
+    const url = PAYSTACK_LINK + "?metadata=" + encodeURIComponent(JSON.stringify(meta));
     window.open(url, "_blank");
   };
 

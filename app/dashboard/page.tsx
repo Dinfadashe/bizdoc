@@ -23,6 +23,8 @@ export default function Dashboard() {
   const [business, setBusiness] = useState<{ name: string; logo_url: string; onboarding_complete: boolean } | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isMarketer, setIsMarketer] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [isStaff, setIsStaff] = useState(false);
   const [staffBusinessOwnerId, setStaffBusinessOwnerId] = useState<string | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
