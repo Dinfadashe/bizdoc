@@ -78,7 +78,7 @@ export default function NewInvoice() {
     } else if (field === "description") setSuggestions(null);
   };
 
-  const applyCatalogItem = (lineItemId: number, catalogItem: CatalogItem) => {
+  const applyCatalogItem = (lineItemId: number, catalogItem: InventoryItem) => {
     setItems(items.map(i => i.id === lineItemId ? { ...i, description: (catalogItem as any).name, unit_price: String((catalogItem as any).selling_price) } : i));
     setSuggestions(null);
   };
@@ -281,3 +281,4 @@ export default function NewInvoice() {
     </div>
   );
 }
+
