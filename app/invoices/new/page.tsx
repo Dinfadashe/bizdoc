@@ -28,7 +28,7 @@ export default function NewInvoice() {
   const [duplicateInvoice, setDuplicateInvoice] = useState<any>(null);
   const [pendingSendNow, setPendingSendNow] = useState(false);
   const [catalog, setCatalog] = useState<InventoryItem[]>([]);
-  const [suggestions, setSuggestions] = useState<{ itemId: number; matches: CatalogItem[] } | null>(null);
+  const [suggestions, setSuggestions] = useState<{ itemId: number; matches: InventoryItem[] } | null>(null);
   const [bizAccounts, setBizAccounts] = useState<BizAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [subscriptionOk, setSubscriptionOk] = useState(true);
