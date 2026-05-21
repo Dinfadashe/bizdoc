@@ -38,13 +38,13 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
 
-    // Auto-add to catalog
+    // Auto-add new items to inventory if not already there
     if (items.length > 0) {
-      const { data: existing } = await supabaseAdmin.from("catalog").select("name").eq("user_id", user_id);
+      const { data: existing } = await supabaseAdmin.from("inventory").select("name").eq("user_id", user_id);
       const existingNames = new Set((existing ?? []).map((c: any) => c.name.toLowerCase().trim()));
       const newItems = items.filter((i: any) => i.description && i.description.trim() && !existingNames.has(i.description.toLowerCase().trim()))
-        .map((i: any) => ({ user_id, name: i.description.trim(), description: "", unit_price: i.unit_price ?? 0 }));
-      if (newItems.length > 0) { try { await supabaseAdmin.from("catalog").insert(newItems); } catch(_) {} }
+        .map((i: any) => ({ user_id, name: i.description.trim(), description: "", selling_price: i.unit_price ?? 0, cost_price: 0, quantity: 0, low_stock_alert: 5, unit: "unit", category: "Other" }));
+      if (newItems.length > 0) { try { await supabaseAdmin.from("inventory").insert(newItems); } catch(_) {} }
     }
 
     return NextResponse.json({ invoice: data });

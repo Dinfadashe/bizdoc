@@ -6,7 +6,7 @@ import { calcTotals, formatCurrency } from "@/lib/utils";
 import { CURRENCIES } from "@/lib/currencies";
 
 interface LineItem { id: number; description: string; qty: number; unit_price: string; }
-interface CatalogItem { id: string; name: string; description: string; unit_price: number; }
+interface InventoryItem { id: string; name: string; description: string; selling_price: number; quantity: number; unit: string; }
 interface BizAccount { id: string; account_name: string; account_number: string; bank_name: string; currency: string; is_default: boolean; }
 
 const emptyItem = (): LineItem => ({ id: Date.now(), description: "", qty: 1, unit_price: "" });
@@ -27,7 +27,7 @@ export default function NewInvoice() {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicateInvoice, setDuplicateInvoice] = useState<any>(null);
   const [pendingSendNow, setPendingSendNow] = useState(false);
-  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [catalog, setCatalog] = useState<InventoryItem[]>([]);
   const [suggestions, setSuggestions] = useState<{ itemId: number; matches: CatalogItem[] } | null>(null);
   const [bizAccounts, setBizAccounts] = useState<BizAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
@@ -39,11 +39,11 @@ export default function NewInvoice() {
       if (!data.user) { router.push("/"); return; }
       setUserId(data.user.id);
       const [catalogRes, accountsRes, subRes] = await Promise.all([
-        supabase.from("catalog").select("*").eq("user_id", data.user.id).order("name"),
+        fetch("/api/inventory?user_id=" + data.user.id).then(r => r.json()).then(d => ({ data: (d.inventory ?? []) })),
         fetch("/api/business-accounts?user_id=" + data.user.id),
         fetch("/api/subscription?user_id=" + data.user.id),
       ]);
-      setCatalog(catalogRes.data ?? []);
+      setCatalog((catalogRes as any).data ?? []);
       const acctData = await accountsRes.json();
       const accounts = acctData.accounts ?? [];
       setBizAccounts(accounts);
@@ -73,13 +73,13 @@ export default function NewInvoice() {
   const updateItem = (id: number, field: keyof LineItem, val: string | number) => {
     setItems(items.map(i => i.id === id ? { ...i, [field]: val } : i));
     if (field === "description" && typeof val === "string" && val.length >= 1) {
-      const matches = catalog.filter(c => c.name.toLowerCase().includes(val.toLowerCase()));
+      const matches = catalog.filter((c: InventoryItem) => c.name.toLowerCase().includes(val.toLowerCase()) && Number(c.quantity) > 0);
       setSuggestions(matches.length > 0 ? { itemId: id, matches } : null);
     } else if (field === "description") setSuggestions(null);
   };
 
   const applyCatalogItem = (lineItemId: number, catalogItem: CatalogItem) => {
-    setItems(items.map(i => i.id === lineItemId ? { ...i, description: catalogItem.name, unit_price: String(catalogItem.unit_price) } : i));
+    setItems(items.map(i => i.id === lineItemId ? { ...i, description: (catalogItem as any).name, unit_price: String((catalogItem as any).selling_price) } : i));
     setSuggestions(null);
   };
 
@@ -232,8 +232,8 @@ export default function NewInvoice() {
                         <div ref={suggestionsRef} style={{ position: "absolute", top: "100%", left: 6, right: 6, background: "white", border: "1.5px solid var(--border)", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", zIndex: 100, maxHeight: 200, overflowY: "auto" }}>
                           {suggestions.matches.map(match => (
                             <div key={match.id} onMouseDown={() => applyCatalogItem(item.id, match)} style={{ padding: "10px 14px", cursor: "pointer", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }} onMouseEnter={e => (e.currentTarget.style.background = "var(--green-light)")} onMouseLeave={e => (e.currentTarget.style.background = "white")}>
-                              <div><div style={{ fontWeight: 700, fontSize: 13 }}>{match.name}</div>{match.description && <div style={{ fontSize: 11, color: "var(--muted)" }}>{match.description}</div>}</div>
-                              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--green)", marginLeft: 16 }}>{Number(match.unit_price).toLocaleString()}</div>
+                              <div><div style={{ fontWeight: 700, fontSize: 13 }}>{(match as any).name}</div><div style={{ fontSize: 11, color: "var(--muted)" }}>Stock: {(match as any).quantity} {(match as any).unit}</div></div>
+                              <div style={{ fontWeight: 700, fontSize: 13, color: "var(--green)", marginLeft: 16 }}>₦{Number((match as any).selling_price).toLocaleString()}</div>
                             </div>
                           ))}
                         </div>

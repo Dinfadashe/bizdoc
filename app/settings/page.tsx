@@ -165,7 +165,7 @@ export default function Settings() {
         <div style={{ display: "flex", background: "#e8e4de", borderRadius: 10, padding: 4, gap: 4, marginBottom: 24 }}>
           {(["profile","accounts","catalog","team"] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "8px 4px", border: "none", borderRadius: 7, fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "var(--font-body)", background: tab === t ? "white" : "transparent", color: tab === t ? "var(--green)" : "var(--muted)", boxShadow: tab === t ? "0 1px 3px rgba(0,0,0,0.1)" : "none" }}>
-              {t === "accounts" ? "Accounts" : t === "catalog" ? "Catalog" : t === "team" ? "Team" : "Profile"}
+              {t === "accounts" ? "Accounts" : t === "catalog" ? "Inventory" : t === "team" ? "Team" : "Profile"}
             </button>
           ))}
         </div>
@@ -259,9 +259,19 @@ export default function Settings() {
         {tab === "catalog" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
-              <div style={{ padding: "14px 24px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>Products & Services Catalog</div>
+              <div style={{ padding: "14px 24px", background: "#faf9f7", borderBottom: "1px solid var(--border)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)" }}>Products & Services — Inventory</div>
               <div style={{ padding: 24 }}>
-                <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 20 }}>Add your products and services here. They auto-suggest when creating invoices.</div>
+                <div style={{ fontSize: 14, color: "var(--muted)", marginBottom: 20, lineHeight: 1.7 }}>Products and services are now managed in the Inventory section. Your inventory items automatically appear as suggestions when creating invoices.</div>
+                <Link href="/inventory"><button style={{ padding: "12px 28px", background: "var(--green)", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)" }}>Go to Inventory →</button></Link>
+              </div>
+            </div>
+          </div>
+        )}
+        {tab === "catalog_old_hidden" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
+              <div style={{ padding: "14px 24px" }}>
+                <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 20 }}>Hidden</div>
                 <div style={{ background: "#faf9f7", border: "1px solid var(--border)", borderRadius: 10, padding: 16, marginBottom: 24 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>Add New Item</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
