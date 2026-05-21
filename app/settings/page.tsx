@@ -267,63 +267,6 @@ export default function Settings() {
             </div>
           </div>
         )}
-        {tab === "catalog_old_hidden" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
-              <div style={{ padding: "14px 24px" }}>
-                <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 20 }}>Hidden</div>
-                <div style={{ background: "#faf9f7", border: "1px solid var(--border)", borderRadius: 10, padding: 16, marginBottom: 24 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>Add New Item</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                    <div><label style={lbl}>Name *</label><input value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} style={inp} placeholder="e.g. Web Design" /></div>
-                    <div><label style={lbl}>Unit Price</label><input type="number" min={0} value={newItem.unit_price} onChange={e => setNewItem({ ...newItem, unit_price: Number(e.target.value) })} style={inp} placeholder="0.00" /></div>
-                  </div>
-                  <div style={{ marginBottom: 12 }}><label style={lbl}>Description (optional)</label><input value={newItem.description} onChange={e => setNewItem({ ...newItem, description: e.target.value })} style={inp} placeholder="Brief description..." /></div>
-                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                    <button type="button" onClick={handleAddCatalogItem} disabled={addingItem || !newItem.name.trim()} style={{ padding: "9px 20px", background: "var(--green)", color: "white", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)" }}>{addingItem ? "Adding..." : "+ Add Item"}</button>
-                    {catalogSaved && <span style={{ color: "var(--green)", fontSize: 13, fontWeight: 600 }}>{catalogSaved}</span>}
-                  </div>
-                </div>
-                {catalogLoading ? <div style={{ textAlign: "center", padding: 40, color: "var(--muted)" }}>Loading...</div> : catalog.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: 40, color: "var(--muted)", fontSize: 14 }}>No items yet.</div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {catalog.map(item => (
-                      <div key={item.id} style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
-                        {editingId === item.id ? (
-                          <div style={{ padding: 14, background: "#f5f9f7" }}>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-                              <div><label style={lbl}>Name</label><input value={editItem.name} onChange={e => setEditItem({ ...editItem, name: e.target.value })} style={inp} /></div>
-                              <div><label style={lbl}>Unit Price</label><input type="number" min={0} value={editItem.unit_price} onChange={e => setEditItem({ ...editItem, unit_price: Number(e.target.value) })} style={inp} /></div>
-                            </div>
-                            <div style={{ marginBottom: 10 }}><label style={lbl}>Description</label><input value={editItem.description} onChange={e => setEditItem({ ...editItem, description: e.target.value })} style={inp} /></div>
-                            <div style={{ display: "flex", gap: 8 }}>
-                              <button type="button" onClick={() => handleUpdateCatalogItem(item.id!)} style={{ padding: "7px 16px", background: "var(--green)", color: "white", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)" }}>Save</button>
-                              <button type="button" onClick={() => setEditingId(null)} style={{ padding: "7px 16px", background: "#f5f2ed", color: "var(--text)", border: "1.5px solid var(--border)", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)" }}>Cancel</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontWeight: 700, fontSize: 14 }}>{item.name}</div>
-                              {item.description && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{item.description}</div>}
-                            </div>
-                            <div style={{ fontWeight: 700, fontSize: 14, color: "var(--green)", minWidth: 80, textAlign: "right" }}>{Number(item.unit_price).toLocaleString()}</div>
-                            <div style={{ display: "flex", gap: 6 }}>
-                              <button type="button" onClick={() => { setEditingId(item.id!); setEditItem({ name: item.name, description: item.description, unit_price: item.unit_price }); }} style={{ padding: "5px 12px", background: "#e8f0ff", color: "#2255cc", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)" }}>Edit</button>
-                              <button type="button" onClick={() => handleDeleteCatalogItem(item.id!)} style={{ padding: "5px 12px", background: "#fff0f0", color: "#cc2222", border: "none", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)" }}>Delete</button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
         {tab === "team" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--border)", overflow: "hidden" }}>
