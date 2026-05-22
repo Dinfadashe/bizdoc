@@ -23,8 +23,6 @@ export default function Dashboard() {
   const [business, setBusiness] = useState<{ name: string; logo_url: string; onboarding_complete: boolean } | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isMarketer, setIsMarketer] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [isStaff, setIsStaff] = useState(false);
   const [isMarketer, setIsMarketer] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -333,6 +331,20 @@ export default function Dashboard() {
               Settings
             </button>
           </Link>
+          {isMarketer && (
+            <Link href="/marketer">
+              <button style={{ background: "#c9a84c", border: "none", color: "#1a1a2e", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>
+                Marketer
+              </button>
+            </Link>
+          )}
+          {isAdmin && (
+            <Link href="/admin">
+              <button style={{ background: "#1a1a2e", border: "none", color: "white", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>
+                Admin
+              </button>
+            </Link>
+          )}
           {isMarketer && (
             <Link href="/marketer">
               <button style={{ background: "#c9a84c", border: "none", color: "#1a1a2e", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>
