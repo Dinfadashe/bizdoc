@@ -26,6 +26,8 @@ export default function Dashboard() {
   const [isStaff, setIsStaff] = useState(false);
   const [isMarketer, setIsMarketer] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isMarketer, setIsMarketer] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [staffBusinessOwnerId, setStaffBusinessOwnerId] = useState<string | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportType, setReportType] = useState<"monthly" | "annual">("monthly");
@@ -63,6 +65,8 @@ export default function Dashboard() {
       } else {
         load(data.user.id);
       }
+      fetch("/api/marketer?user_id=" + data.user.id).then(r => r.json()).then(d => { if (d.marketer) setIsMarketer(true); }).catch(() => {});
+      if (data.user.email === "dinfadashe@gmail.com") setIsAdmin(true);
     });
   }, [router, load]);
 
@@ -331,6 +335,20 @@ export default function Dashboard() {
               Settings
             </button>
           </Link>
+          {isMarketer && (
+            <Link href="/marketer">
+              <button style={{ background: "#c9a84c", border: "none", color: "#1a1a2e", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>
+                Marketer
+              </button>
+            </Link>
+          )}
+          {isAdmin && (
+            <Link href="/admin">
+              <button style={{ background: "#1a1a2e", border: "none", color: "white", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>
+                Admin
+              </button>
+            </Link>
+          )}
           {isMarketer && (
             <Link href="/marketer">
               <button style={{ background: "#c9a84c", border: "none", color: "#1a1a2e", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>
