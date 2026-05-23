@@ -56,7 +56,9 @@ export default function AdminDashboard() {
     setMarketers(m.marketers ?? []);
     setReferrals(r.referrals ?? []);
     setEarnings(e.earnings ?? []);
-    const tRes = await fetch("/api/support?user_id=" + data.session.user.id + "&admin=1", { headers });
+    const session = await supabase.auth.getSession();
+    const adminId = session.data.session?.user?.id;
+    const tRes = await fetch("/api/support?user_id=" + adminId + "&admin=1", { headers });
     const tData = await tRes.json();
     setTickets(tData.tickets ?? []);
     setLoading(false);
@@ -399,3 +401,5 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+
