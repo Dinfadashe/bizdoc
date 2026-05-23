@@ -317,6 +317,7 @@ export default function Dashboard() {
             <Link href="/stats"><button style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>Statistics</button></Link>
             <Link href="/subscribe"><button style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>Subscription</button></Link>
             <Link href="/settings"><button style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>Settings</button></Link>
+            <Link href="/support"><button style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>Support</button></Link>
             {isMarketer && (<Link href="/marketer"><button style={{ background: "#c9a84c", border: "none", color: "#1a1a2e", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>Marketer</button></Link>)}
             {isAdmin && (<Link href="/admin"><button style={{ background: "#1a1a2e", border: "none", color: "white", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>Admin</button></Link>)}
             <button onClick={signOut} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>Sign Out</button>
@@ -335,6 +336,7 @@ export default function Dashboard() {
             { href: "/stats", label: "Statistics" },
             { href: "/subscribe", label: "Subscription" },
             { href: "/settings", label: "Settings" },
+            { href: "/support", label: "Support" },
           ].map(({ href, label }) => (
             <Link key={label} href={href} onClick={() => setMenuOpen(false)}>
               <button style={{ width: "100%", textAlign: "left", background: "none", border: "none", color: "white", padding: "12px 8px", cursor: "pointer", fontSize: 15, fontFamily: "var(--font-body)", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>

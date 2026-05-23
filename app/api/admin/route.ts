@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     const { email } = body;
     // Find user by email
     const { data: users } = await supabaseAdmin.auth.admin.listUsers();
-    const user = users?.users?.find((u: any) => u.email === email);
+    const user = users?.users?.find((u: any) => u.email?.toLowerCase() === email?.toLowerCase().trim());
     if (!user) return NextResponse.json({ error: "No account found with that email. Ask them to register first." }, { status: 404 });
     // Check if already a marketer
     const { data: existing } = await supabaseAdmin.from("marketers").select("id").eq("user_id", user.id).single();
