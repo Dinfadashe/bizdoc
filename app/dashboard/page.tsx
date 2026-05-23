@@ -26,8 +26,6 @@ export default function Dashboard() {
   const [isStaff, setIsStaff] = useState(false);
   const [isMarketer, setIsMarketer] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isMarketer, setIsMarketer] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [staffBusinessOwnerId, setStaffBusinessOwnerId] = useState<string | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportType, setReportType] = useState<"monthly" | "annual">("monthly");
