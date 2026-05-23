@@ -347,34 +347,12 @@ export default function Dashboard() {
               </button>
             </Link>
           )}
-          {isMarketer && (
-            <Link href="/marketer">
-              <button style={{ background: "#c9a84c", border: "none", color: "#1a1a2e", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>
-                Marketer
-              </button>
-            </Link>
-          )}
-          {isAdmin && (
-            <Link href="/admin">
-              <button style={{ background: "#1a1a2e", border: "none", color: "white", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>
-                Admin
-              </button>
-            </Link>
-          )}
-          {isMarketer && (
-            <Link href="/marketer">
-              <button style={{ background: "#c9a84c", border: "none", color: "#1a1a2e", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>
-                Marketer
-              </button>
-            </Link>
-          )}
-          {isAdmin && (
-            <Link href="/admin">
-              <button style={{ background: "#1a1a2e", border: "none", color: "white", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 700 }}>
-                Admin
-              </button>
-            </Link>
-          )}
+
+
+
+
+
+
           <button onClick={signOut} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: "white", padding: "6px 14px", borderRadius: 6, cursor: "pointer", fontSize: 13, fontFamily: "var(--font-body)" }}>
             Sign Out
           </button>
