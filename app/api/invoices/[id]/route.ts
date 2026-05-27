@@ -77,3 +77,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: err instanceof Error ? err.message : "Error" }, { status: 500 });
   }
 }
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const { data: invoice } = await supabaseAdmin.from("invoices").select("status").eq("id", id).single();
+    if (!invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    if (invoice.status !== "draft") return NextResponse.json({ error: "Only draft invoices can be deleted" }, { status: 400 });
+    await supabaseAdmin.from("receipts").delete().eq("invoice_id", id);
+    await supabaseAdmin.from("invoices").delete().eq("id", id);
+    return NextResponse.json({ deleted: true });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Error" }, { status: 500 });
+  }
+}

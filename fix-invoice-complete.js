@@ -1,4 +1,46 @@
-"use client";
+const fs = require('fs');
+
+// ── 1. Add DELETE to invoice API ─────────────────────────────
+let apiContent = fs.readFileSync('app/api/invoices/[id]/route.ts', 'utf8');
+if (!apiContent.includes('export async function DELETE')) {
+  apiContent += `
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const { data: invoice } = await supabaseAdmin.from("invoices").select("status").eq("id", id).single();
+    if (!invoice) return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    if (invoice.status !== "draft") return NextResponse.json({ error: "Only draft invoices can be deleted" }, { status: 400 });
+    await supabaseAdmin.from("receipts").delete().eq("invoice_id", id);
+    await supabaseAdmin.from("invoices").delete().eq("id", id);
+    return NextResponse.json({ deleted: true });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Error" }, { status: 500 });
+  }
+}`;
+  fs.writeFileSync('app/api/invoices/[id]/route.ts', apiContent, 'utf8');
+  console.log('Added DELETE to invoice API');
+} else {
+  console.log('DELETE already exists');
+}
+
+// ── 2. Add calcTotals to utils if missing ────────────────────
+let utilsContent = fs.readFileSync('lib/utils.ts', 'utf8');
+if (!utilsContent.includes('calcTotals')) {
+  utilsContent += `
+export function calcTotals(items: { qty: number; unit_price: number }[], discountType: string, discountValue: number, taxRate: number) {
+  const subtotal = items.reduce((s, i) => s + i.qty * i.unit_price, 0);
+  const discountAmount = discountType === "percent" ? subtotal * (discountValue / 100) : discountValue;
+  const afterDiscount = Math.max(0, subtotal - discountAmount);
+  const taxAmount = afterDiscount * (taxRate / 100);
+  const total = afterDiscount + taxAmount;
+  return { subtotal, discountAmount, taxAmount, total };
+}`;
+  fs.writeFileSync('lib/utils.ts', utilsContent, 'utf8');
+  console.log('Added calcTotals to utils');
+}
+
+// ── 3. Rewrite invoice detail page with edit + mobile fix ────
+const invoiceDetailContent = `"use client";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useParams } from "next/navigation";
@@ -160,7 +202,7 @@ export default function InvoiceDetail() {
         canvas.toBlob(async (blob) => {
           if (!blob) return;
           const file = new File([blob], "invoice-" + invoice.invoice_number + ".png", { type: "image/png" });
-          const msg = "Hi " + (invoice.client_name || "there") + ", please find your invoice " + invoice.invoice_number + " for " + formatCurrency(invoice.total, invoice.currency) + " from " + (business?.name ?? "us") + ".\n\nPay here: " + payUrl;
+          const msg = "Hi " + (invoice.client_name || "there") + ", please find your invoice " + invoice.invoice_number + " for " + formatCurrency(invoice.total, invoice.currency) + " from " + (business?.name ?? "us") + ".\\n\\nPay here: " + payUrl;
           if (navigator.share && navigator.canShare({ files: [file] })) {
             await navigator.share({ text: msg, files: [file] });
           } else {
@@ -174,7 +216,7 @@ export default function InvoiceDetail() {
       }
     } catch (err) {
       const payUrl = window.location.origin + "/invoices/" + id + "/pay";
-      const msg = "Hi, please find invoice " + invoice.invoice_number + " for " + formatCurrency(invoice.total, invoice.currency) + ".\n\nPay here: " + payUrl;
+      const msg = "Hi, please find invoice " + invoice.invoice_number + " for " + formatCurrency(invoice.total, invoice.currency) + ".\\n\\nPay here: " + payUrl;
       window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
     }
     setSharingWA(false);
@@ -237,7 +279,7 @@ export default function InvoiceDetail() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--cream)" }}>
-      <style>{`
+      <style>{\`
         @media print {
           .no-print { display: none !important; }
           body { background: white !important; margin: 0 !important; padding: 0 !important; }
@@ -256,7 +298,7 @@ export default function InvoiceDetail() {
         @media (max-width: 480px) {
           .invoice-ussd-grid { grid-template-columns: 1fr !important; }
         }
-      `}</style>
+      \`}</style>
 
       {/* Delete confirmation modal */}
       {showDeleteConfirm && (
@@ -566,4 +608,8 @@ export default function InvoiceDetail() {
       </div>
     </div>
   );
-}
+}`;
+
+fs.writeFileSync('app/invoices/[id]/page.tsx', invoiceDetailContent, 'utf8');
+console.log('Rewrote invoice detail page');
+console.log('All done!');
