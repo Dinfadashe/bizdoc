@@ -1,4 +1,6 @@
-"use client";
+const fs = require('fs');
+
+const content = `"use client";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useParams } from "next/navigation";
@@ -153,7 +155,7 @@ export default function InvoiceDetail() {
     try {
       const payUrl = window.location.origin + "/invoices/" + id + "/pay";
       const invoiceEl = document.getElementById("invoice-doc-inner");
-      const msg = "Hi " + (invoice.client_name || "there") + ", please find invoice " + invoice.invoice_number + " for " + formatCurrency(invoice.total, invoice.currency) + " from " + (business?.name ?? "us") + ".\n\nPay here: " + payUrl;
+      const msg = "Hi " + (invoice.client_name || "there") + ", please find invoice " + invoice.invoice_number + " for " + formatCurrency(invoice.total, invoice.currency) + " from " + (business?.name ?? "us") + ".\\n\\nPay here: " + payUrl;
       if (invoiceEl) {
         const canvas = await html2canvas(invoiceEl, { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false });
         canvas.toBlob(async (blob) => {
@@ -222,7 +224,7 @@ export default function InvoiceDetail() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--cream)" }}>
-      <style>{`
+      <style>{\`
         @media print { .no-print{display:none!important} body{background:white!important;margin:0!important;padding:0!important} *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important} @page{margin:0.4cm;size:A4 portrait} }
         @media(max-width:700px){
           .inv-header-row{flex-direction:column!important;gap:12px!important}
@@ -242,7 +244,7 @@ export default function InvoiceDetail() {
           .inv-ussd-grid{grid-template-columns:1fr!important}
           .edit-grid-3{grid-template-columns:1fr!important}
         }
-      `}</style>
+      \`}</style>
 
       {/* Delete confirm */}
       {showDeleteConfirm && (
@@ -483,4 +485,15 @@ export default function InvoiceDetail() {
       </div>
     </div>
   );
-}
+}`;
+
+fs.writeFileSync('app/invoices/[id]/page.tsx', content, 'utf8');
+
+// Verify
+const written = fs.readFileSync('app/invoices/[id]/page.tsx', 'utf8');
+console.log('editMode:', written.includes('editMode'));
+console.log('handleSaveEdit:', written.includes('handleSaveEdit'));
+console.log('handleDelete:', written.includes('handleDelete'));
+console.log('openEditMode:', written.includes('openEditMode'));
+console.log('mobile CSS:', written.includes('@media(max-width:700px)'));
+console.log('Lines:', written.split('\n').length);
