@@ -31,6 +31,7 @@ export interface Invoice {
   paid_at: string | null;
   paystack_reference: string | null;
   payment_url: string | null;
+  display_account_id: string | null;
   created_at: string;
 }
 
@@ -54,3 +55,4 @@ export interface Business {
   logo_url: string;
   currency: string;
 }
+
