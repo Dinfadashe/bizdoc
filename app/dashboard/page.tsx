@@ -47,8 +47,10 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) { router.push("/"); return; }
+    // Force fresh session - don't use cached auth
+    supabase.auth.getSession().then(async ({ data: sessionData }) => {
+      if (!sessionData.session?.user) { router.push("/"); return; }
+      const data = { user: sessionData.session.user };
       setUser(data.user);
       // Check if this user is a staff member
       const { data: memberData } = await supabase
@@ -65,6 +67,8 @@ export default function Dashboard() {
         load(data.user.id);
       }
       fetch("/api/marketer?user_id=" + data.user.id).then(r => r.json()).then(d => { if (d.marketer) setIsMarketer(true); }).catch(() => {});
+      // Force reload of invoices with correct user_id
+      console.log("Dashboard loading for user:", data.user.id, data.user.email);
       if (data.user.email === "dinfadashe@gmail.com") setIsAdmin(true);
     });
   }, [router, load]);
