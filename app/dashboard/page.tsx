@@ -26,6 +26,9 @@ export default function Dashboard() {
   const [isStaff, setIsStaff] = useState(false);
   const [isMarketer, setIsMarketer] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [memberships, setMemberships] = useState<any[]>([]);
+  const [activeMode, setActiveMode] = useState<"own"|string>("own"); // "own" or team_member id
+  const [showSwitcher, setShowSwitcher] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [staffBusinessOwnerId, setStaffBusinessOwnerId] = useState<string | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
@@ -67,6 +70,7 @@ export default function Dashboard() {
         load(data.user.id);
       }
       fetch("/api/marketer?user_id=" + data.user.id).then(r => r.json()).then(d => { if (d.marketer) setIsMarketer(true); }).catch(() => {});
+      fetch("/api/team/memberships?user_id=" + data.user.id).then(r => r.json()).then(d => { setMemberships(d.memberships ?? []); }).catch(() => {});
       // Force reload of invoices with correct user_id
       console.log("Dashboard loading for user:", data.user.id, data.user.email);
       if (data.user.email === "dinfadashe@gmail.com") setIsAdmin(true);
@@ -309,9 +313,29 @@ export default function Dashboard() {
         <div style={{ padding: "0 20px", height: 60, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <img src="/logo.png" alt="BizDoc" style={{ width: 36, height: 36, objectFit: "contain", borderRadius: 6, background: "white", padding: 2 }} />
-            <div style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "white" }}>
+            <div style={{ position: "relative" }}>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "white", cursor: memberships.length > 0 ? "pointer" : "default", display: "flex", alignItems: "center", gap: 6 }} onClick={() => memberships.length > 0 && setShowSwitcher(!showSwitcher)}>
               {business?.name || "BizDoc"}
+              {memberships.length > 0 && <span style={{ fontSize: 12, background: "rgba(255,255,255,0.2)", padding: "2px 6px", borderRadius: 10 }}>▾</span>}
             </div>
+            {showSwitcher && memberships.length > 0 && (
+              <div style={{ position: "absolute", top: "100%", left: 0, marginTop: 8, background: "white", borderRadius: 10, border: "1px solid var(--border)", boxShadow: "0 4px 20px rgba(0,0,0,0.15)", zIndex: 200, minWidth: 220, overflow: "hidden" }}>
+                <div style={{ padding: "8px 14px", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "var(--muted)", borderBottom: "1px solid var(--border)" }}>Switch Account</div>
+                <div onClick={() => { setActiveMode("own"); setShowSwitcher(false); if (user) load(user.id); }} style={{ padding: "12px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, background: activeMode === "own" ? "var(--green-light)" : "white", borderBottom: "1px solid var(--border)" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--green)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "white", flexShrink: 0 }}>B</div>
+                  <div><div style={{ fontWeight: 700, fontSize: 13 }}>My Business</div><div style={{ fontSize: 11, color: "var(--muted)" }}>Owner account</div></div>
+                  {activeMode === "own" && <span style={{ marginLeft: "auto", color: "var(--green)", fontWeight: 700 }}>✓</span>}
+                </div>
+                {memberships.map((m: any) => (
+                  <div key={m.id} onClick={() => { setActiveMode(m.id); setShowSwitcher(false); load(m.owner_user_id); }} style={{ padding: "12px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, background: activeMode === m.id ? "var(--green-light)" : "white", borderBottom: "1px solid var(--border)" }}>
+                    {m.businesses?.logo_url ? <img src={m.businesses.logo_url} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "contain", border: "1px solid var(--border)", flexShrink: 0 }}/> : <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#e8f0ff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#2255cc", flexShrink: 0 }}>{m.businesses?.name?.[0]?.toUpperCase() || "B"}</div>}
+                    <div><div style={{ fontWeight: 700, fontSize: 13 }}>{m.businesses?.name || "Business"}</div><div style={{ fontSize: 11, color: "var(--muted)", textTransform: "capitalize" }}>{m.role}</div></div>
+                    {activeMode === m.id && <span style={{ marginLeft: "auto", color: "var(--green)", fontWeight: 700 }}>✓</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           </div>
           {/* Desktop nav */}
           <div className="dash-nav-links">
