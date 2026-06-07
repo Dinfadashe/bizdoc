@@ -1,4 +1,6 @@
-"use client";
+const fs = require('fs');
+
+const content = `"use client";
 export const dynamic = "force-dynamic";
 import { Suspense, useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
@@ -243,4 +245,12 @@ export default function JoinPage() {
       <JoinContent />
     </Suspense>
   );
-}
+}`;
+
+fs.writeFileSync('app/join/page.tsx', content, 'utf8');
+const result = fs.readFileSync('app/join/page.tsx', 'utf8');
+console.log('Lines:', result.split('\n').length);
+console.log('acceptInvite:', result.includes('acceptInvite'));
+console.log('invite_token query:', result.includes('invite_token'));
+console.log('businesses query:', result.includes("from(\"businesses\")"));
+console.log(result.includes('acceptInvite') ? 'SUCCESS' : 'FAILED');
