@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import SyncStatusBadgeWrapper from "@/components/SyncStatusBadgeWrapper";
 
 export const metadata: Metadata = {
   title: "BizDoc - Business Management, Payment and Sales Records",
@@ -45,7 +46,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 .catch(function(err) { console.log('SW failed:', err); });
             });
           }
-
           // Keep session alive - check every 10 minutes
           setInterval(function() {
             const keys = Object.keys(localStorage);
@@ -66,7 +66,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }, 600000);
         `}} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <SyncStatusBadgeWrapper />
+      </body>
     </html>
   );
 }
