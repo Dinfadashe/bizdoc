@@ -50,15 +50,11 @@ export async function POST(req: NextRequest) {
             month: earningMonth,
             plan, paid: false,
             paystack_reference: reference,
-          }).onConflict ? null : null;
+          });
         }
         // Update marketer total earned
         const totalCommission = commission * months;
-        await supabaseAdmin.rpc("increment_marketer_earned", { marketer_id: marketer.id, amount: totalCommission }).catch(() => {
-          supabaseAdmin.from("marketers").select("total_earned").eq("id", marketer.id).single().then(({ data }) => {
-            if (data) supabaseAdmin.from("marketers").update({ total_earned: Number(data.total_earned) + totalCommission }).eq("id", marketer.id);
-          });
-        });
+        try { await supabaseAdmin.rpc("increment_marketer_earned", { marketer_id: marketer.id, amount: totalCommission }); } catch { const { data } = await supabaseAdmin.from("marketers").select("total_earned").eq("id", marketer.id).single(); if (data) await supabaseAdmin.from("marketers").update({ total_earned: Number(data.total_earned) + totalCommission }).eq("id", marketer.id); }
         console.log("Commission recorded for marketer:", marketer.email, "amount:", totalCommission);
       }
     }
@@ -69,3 +65,4 @@ export async function POST(req: NextRequest) {
 }
 
 export const config = { api: { bodyParser: false } };
+

@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
           payment_method: channel,
           paystack_reference: reference,
           paid_at,
-        }).catch(() => {});
+        });
         return NextResponse.json({ ok: true });
       }
 
